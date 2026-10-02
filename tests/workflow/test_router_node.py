@@ -1,5 +1,6 @@
 from unittest.mock import Mock
 
+from ai_lib.registry import RegistryKeysUnavailable
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from src.agents.base.system_prompt import (
@@ -119,3 +120,18 @@ def test_router_falls_back_when_direct_response_is_empty(monkeypatch):
     result = router_node.router_node({"messages": [HumanMessage(content="Ajuda")]})
 
     assert result == {"route": "orchestrator", "turn_agents": ["router_invalid_response"]}
+
+
+def test_router_falls_back_to_orchestrator_when_registry_has_no_key(monkeypatch):
+    llm = Mock()
+    llm.invoke.side_effect = RegistryKeysUnavailable("no key available")
+    monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
+
+    result = router_node.router_node(
+        {"messages": [HumanMessage(content="Preciso de paineis solares")]}
+    )
+
+    assert result == {
+        "route": "orchestrator",
+        "turn_agents": ["router_invalid_response"],
+    }
