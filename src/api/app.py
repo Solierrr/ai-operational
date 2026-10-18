@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.a2a.server import mount as mount_a2a
 from src.api.routes import chat
 from src.core.llm.keys import key_client
 from src.infra.database.mongo.indexes.user_memory_indexes import (
@@ -16,13 +17,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="[NOME_DO_PROJETO] API",
-    description="[preencha: descrição curta do assistente de IA e do domínio que ele atende]",
+    title="Solaria Operacional API",
+    description="Agente que ajuda a operar o SaaS: acha telas e propõe ações com aprovação do usuário.",
     version="0.1.0",
     lifespan=lifespan,
 )
 
 app.include_router(chat.router)
+mount_a2a(app)
 
 
 @app.get("/health")

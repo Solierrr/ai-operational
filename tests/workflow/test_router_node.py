@@ -19,12 +19,12 @@ def _mock_llm(route, direct_response=""):
 
 
 def test_router_routes_to_valid_specialist(monkeypatch):
-    llm = _mock_llm("example_specialist")
+    llm = _mock_llm("screen_finder")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
     result = router_node.router_node(
         {"messages": [HumanMessage(content="Preciso de ajuda")]}
     )
-    assert result == {"route": "example_specialist", "turn_agents": ["router"]}
+    assert result == {"route": "screen_finder", "turn_agents": ["router"]}
     messages = llm.invoke.call_args.args[0]
     assert isinstance(messages[0], SystemMessage)
     assert SYSTEM_CORE_SECURITY.strip() in messages[0].content
@@ -35,21 +35,21 @@ def test_router_routes_to_valid_specialist(monkeypatch):
 
 
 def test_router_routes_to_second_specialist(monkeypatch):
-    llm = _mock_llm("example_specialist_two")
+    llm = _mock_llm("action_proposer")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
 
     result = router_node.router_node(
         {"messages": [HumanMessage(content="Preciso de outra coisa")]}
     )
 
-    assert result == {"route": "example_specialist_two", "turn_agents": ["router"]}
+    assert result == {"route": "action_proposer", "turn_agents": ["router"]}
 
     llm = _mock_llm("orchestrator")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
     result = router_node.router_node(
         {
             "messages": [HumanMessage(content="Ja respondeu")],
-            "turn_agents": ["example_specialist"],
+            "turn_agents": ["screen_finder"],
         }
     )
     assert result["route"] == "orchestrator"
@@ -70,7 +70,7 @@ def test_router_short_circuits_at_specialist_limit(monkeypatch):
     result = router_node.router_node(
         {
             "messages": [HumanMessage(content="Mais uma")],
-            "turn_agents": ["example_specialist"],
+            "turn_agents": ["screen_finder"],
         }
     )
     assert result["route"] == "orchestrator"
@@ -78,20 +78,20 @@ def test_router_short_circuits_at_specialist_limit(monkeypatch):
 
 
 def test_router_only_offers_unused_routes(monkeypatch):
-    llm = _mock_llm("example_specialist_two")
+    llm = _mock_llm("action_proposer")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
 
     router_node.router_node(
         {
             "messages": [HumanMessage(content="Preciso de ajuda")],
             "summary": "O usuario ja recebeu uma resposta de um especialista.",
-            "turn_agents": ["example_specialist"],
+            "turn_agents": ["screen_finder"],
         }
     )
 
     messages = llm.invoke.call_args.args[0]
     assert (
-        "Rotas disponiveis nesta solicitacao: example_specialist_two."
+        "Rotas disponiveis nesta solicitacao: action_proposer."
         in messages[1].content
     )
     assert "Resumo" in messages[2].content
@@ -106,7 +106,7 @@ def test_router_falls_back_for_invalid_route(monkeypatch):
 
 def test_router_falls_back_for_malformed_response(monkeypatch):
     llm = Mock()
-    llm.invoke.return_value = AIMessage(content="Escolha example_specialist")
+    llm.invoke.return_value = AIMessage(content="Escolha screen_finder")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
     result = router_node.router_node({"messages": [HumanMessage(content="Ajuda")]})
     assert result == {"route": "orchestrator", "turn_agents": ["router_invalid_response"]}

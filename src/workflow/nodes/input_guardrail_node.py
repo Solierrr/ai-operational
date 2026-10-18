@@ -4,6 +4,7 @@ from groq import GroqError
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
 from pydantic import BaseModel, ValidationError
 
+from src.actions.decision import quick_decision
 from src.agents.base.base_prompt import build_system_prompt
 from src.core.guardrails.anonymize import anonymize_text
 from src.core.guardrails.injection_patterns import (
@@ -94,6 +95,15 @@ def input_guardrail_node(state: GraphState, config=None) -> dict:
         return _blocked_result(state, "manipulacao_regex")
     if matches_internal_data_keyword(last_message):
         return _blocked_result(state, "dados_internos_regex")
+
+    if state.get("pending_proposal") and quick_decision(last_message):
+        # "sim" ou "não" a uma proposta pendente não precisa de classificação por LLM,
+        # que poderia tratar uma resposta tão curta como fora de escopo.
+        return {
+            "route": "proceed",
+            "pii_map": {},
+            "turn_agents": ["input_guardrail_approved"],
+        }
 
     anonymized_text, pii_map = anonymize_text(last_message)
     formatted_prompt = INPUT_GUARDRAIL_PROMPT.format(mensagem=anonymized_text)

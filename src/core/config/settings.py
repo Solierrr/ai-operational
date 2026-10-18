@@ -21,6 +21,12 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
 
+    # api-core: onde as ações aprovadas pelo usuário são executadas, com o JWT dele.
+    API_CORE_URL: str = "http://localhost:8080/api"
+
+    # A2A: URL pública deste serviço, anunciada no Agent Card.
+    A2A_PUBLIC_URL: str = "http://localhost:8003"
+
     TEST_USER_TOKEN: str | None = (
         None  # só pra uso local via main.py, nunca em produção
     )

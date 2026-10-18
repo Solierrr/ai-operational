@@ -67,6 +67,13 @@ def router_node(state: GraphState, runnable_config=None) -> dict:
     available_routes = sorted(available_specialist_routes(state))
     limit_reached = len(consulted) >= config.MAX_SPECIALISTS_PER_REQUEST
 
+    if state.get("pending_proposal"):
+        # Há uma proposta esperando decisão: a resposta do usuário é sobre ela.
+        return {
+            "route": "proposal_decision",
+            "turn_agents": append_turn_agent(state, "router"),
+        }
+
     if consulted and (limit_reached or not available_routes):
         return {
             "route": "orchestrator",
