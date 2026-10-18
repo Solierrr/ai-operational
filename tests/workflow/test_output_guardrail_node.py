@@ -1,6 +1,5 @@
 from unittest.mock import Mock
 
-import ai_lib.guardrails.nodes as guardrail_nodes
 from groq import GroqError
 from langchain_core.messages import AIMessage, RemoveMessage
 
@@ -35,7 +34,7 @@ def test_output_guardrail_deanonymizes_valid_response(monkeypatch):
     llm = _mock_llm("Ola, [PII_NOME].", corrected=True)
     deanonymize = Mock(return_value="Ola, Ana.")
     monkeypatch.setattr(output_guardrail_node, "llm_groq", Mock(return_value=llm))
-    monkeypatch.setattr(guardrail_nodes, "deanonymize_text", deanonymize)
+    monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
     result = output_guardrail_node.output_guardrail_node(_state())
     assert isinstance(result["messages"][0], RemoveMessage)
     assert result["messages"][1].content == "Ola, Ana."
@@ -48,7 +47,7 @@ def test_output_guardrail_preserves_approved_response(monkeypatch):
     llm = _mock_llm("Resposta revisada")
     deanonymize = Mock(return_value="Resposta revisada")
     monkeypatch.setattr(output_guardrail_node, "llm_groq", Mock(return_value=llm))
-    monkeypatch.setattr(guardrail_nodes, "deanonymize_text", deanonymize)
+    monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
 
     result = output_guardrail_node.output_guardrail_node(_state("msg-2"))
 
@@ -61,7 +60,7 @@ def test_output_guardrail_fails_closed_when_groq_raises(monkeypatch):
     llm.invoke.side_effect = GroqError("groq indisponivel")
     deanonymize = Mock()
     monkeypatch.setattr(output_guardrail_node, "llm_groq", Mock(return_value=llm))
-    monkeypatch.setattr(guardrail_nodes, "deanonymize_text", deanonymize)
+    monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
     result = output_guardrail_node.output_guardrail_node(_state())
     assert result["messages"][1].content == output_guardrail_node.FALLBACK_RESPONSE
     deanonymize.assert_not_called()
@@ -72,7 +71,7 @@ def test_output_guardrail_fails_closed_for_malformed_response(monkeypatch):
     llm.invoke.return_value = AIMessage(content="STATUS: APROVADO")
     deanonymize = Mock()
     monkeypatch.setattr(output_guardrail_node, "llm_groq", Mock(return_value=llm))
-    monkeypatch.setattr(guardrail_nodes, "deanonymize_text", deanonymize)
+    monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
     result = output_guardrail_node.output_guardrail_node(_state())
     assert result["messages"][1].content == output_guardrail_node.FALLBACK_RESPONSE
     deanonymize.assert_not_called()
@@ -83,9 +82,17 @@ def test_output_guardrail_fails_closed_for_unknown_status(monkeypatch):
     llm.invoke.return_value = AIMessage(content="STATUS: INDEFINIDO\nRESPOSTA: texto")
     deanonymize = Mock()
     monkeypatch.setattr(output_guardrail_node, "llm_groq", Mock(return_value=llm))
-    monkeypatch.setattr(guardrail_nodes, "deanonymize_text", deanonymize)
+    monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
 
     result = output_guardrail_node.output_guardrail_node(_state("msg-3"))
 
     assert result["messages"][1].content == output_guardrail_node.FALLBACK_RESPONSE
     deanonymize.assert_not_called()
+
+
+def test_output_guardrail_parser_preserves_multiline_response():
+    review = output_guardrail_node._parse_revisao_compliance(
+        "STATUS: CORRIGIDO\nRESPOSTA: Primeira linha.\nSegunda linha."
+    )
+    assert review.foi_corrigida is True
+    assert review.resposta_revisada == "Primeira linha.\nSegunda linha."
