@@ -7,7 +7,7 @@ MAX_SPECIALISTS_PER_REQUEST: Final[int] = 3
 # `src/agents/specialist/router/router_prompt.py`.
 SPECIALIST_ROUTES: Final[frozenset[str]] = frozenset(
     {
-        "example_specialist",
-        "example_specialist_two",
+        "screen_finder",
+        "action_proposer",
     }
 )

@@ -6,13 +6,14 @@ from src.workflow.edges import (
     decide_post_judge,
     decide_post_router,
 )
-from src.workflow.nodes.example_specialist_node import example_specialist_node
-from src.workflow.nodes.example_specialist_two_node import example_specialist_two_node
+from src.workflow.nodes.action_proposer_node import action_proposer_node
 from src.workflow.nodes.input_guardrail_node import input_guardrail_node
 from src.workflow.nodes.judge_node import judge_node
 from src.workflow.nodes.orchestrator_node import orchestrator_node
 from src.workflow.nodes.output_guardrail_node import output_guardrail_node
+from src.workflow.nodes.proposal_decision_node import proposal_decision_node
 from src.workflow.nodes.router_node import router_node
+from src.workflow.nodes.screen_finder_node import screen_finder_node
 from src.workflow.nodes.summary_node import condense_history_node
 from src.workflow.state import GraphState
 
@@ -23,8 +24,9 @@ graph.add_node("condense_memory", condense_history_node)
 graph.add_node("router", router_node)
 # Adicione um graph.add_node(...) aqui para cada novo especialista, com o
 # mesmo nome usado em `src/workflow/config.py` (SPECIALIST_ROUTES).
-graph.add_node("example_specialist", example_specialist_node)
-graph.add_node("example_specialist_two", example_specialist_two_node)
+graph.add_node("screen_finder", screen_finder_node)
+graph.add_node("action_proposer", action_proposer_node)
+graph.add_node("proposal_decision", proposal_decision_node)
 graph.add_node("orchestrator", orchestrator_node)
 graph.add_node("judge", judge_node)
 graph.add_node("output_guardrail", output_guardrail_node)
@@ -43,15 +45,18 @@ graph.add_conditional_edges(
     "router",
     decide_post_router,
     {
-        "example_specialist": "example_specialist",
-        "example_specialist_two": "example_specialist_two",
+        "screen_finder": "screen_finder",
+        "action_proposer": "action_proposer",
+        "proposal_decision": "proposal_decision",
         "orchestrator": "orchestrator",
         "end": "output_guardrail",
     },
 )
 
-graph.add_edge("example_specialist", "router")
-graph.add_edge("example_specialist_two", "router")
+graph.add_edge("screen_finder", "router")
+# Propostas e resultados de ações chegam ao usuário exatamente como foram montados.
+graph.add_edge("action_proposer", END)
+graph.add_edge("proposal_decision", END)
 graph.add_edge("orchestrator", "judge")
 
 graph.add_conditional_edges(
