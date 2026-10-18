@@ -10,3 +10,4 @@ class GraphState(MessagesState):
     judge_status: str
     user_id: str | None
     user_memory: str
+    pending_proposal: dict | None

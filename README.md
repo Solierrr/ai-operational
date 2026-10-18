@@ -1,8 +1,6 @@
 # ai-operational
 
-[preencha: parágrafo único explicando o propósito deste assistente de IA —
-qual domínio ele atende, que tipo de usuário conversa com ele e como ele se
-encaixa nos demais serviços da organização. Mínimo de 60 palavras.]
+Agente que ajuda o usuário a operar o SaaS da Solaria (fornecedores, demandantes e administradores de empresa). Ele indica a tela certa do web-app para o que o usuário quer fazer e, quando o usuário pede, propõe uma ação (hoje, cadastrar uma oferta de placa) com uma mensagem que explica o que será feito. A ação só é executada no `api-core`, com o JWT do próprio usuário, depois do aceite dele; se ele recusar, nada é gravado. É chamado pelo `ai-assistant` por A2A, onde a proposta pendente vira o estado `input_required`.
 
 <p>
 

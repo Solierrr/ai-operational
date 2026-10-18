@@ -14,6 +14,8 @@ def decide_post_router(state: GraphState) -> str:
     route = state.get("route", "end")
     if route == "orchestrator":
         return "orchestrator"
+    if route == "proposal_decision":
+        return "proposal_decision"
     if route not in config.SPECIALIST_ROUTES:
         return "end"
     if route not in available_specialist_routes(state):

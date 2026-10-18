@@ -78,14 +78,14 @@ def test_step_tracker_ordem_incrementa_entre_llm_e_tool(monkeypatch):
 
     async def cenario():
         await tracker.on_llm_start(
-            {}, ["prompt"], run_id="run-1", metadata={"langgraph_node": "example_specialist"}
+            {}, ["prompt"], run_id="run-1", metadata={"langgraph_node": "screen_finder"}
         )
         await tracker.on_llm_end(_resposta_llm(), run_id="run-1")
         await tracker.on_tool_start(
             {"name": "listar_itens_exemplo"},
             "{}",
             run_id="run-2",
-            metadata={"langgraph_node": "example_specialist"},
+            metadata={"langgraph_node": "screen_finder"},
         )
         await tracker.on_tool_end("resultado da tool", run_id="run-2")
 
@@ -219,7 +219,7 @@ def test_step_tracker_on_tool_end_manda_campos_obrigatorios_do_llm(monkeypatch):
             {"name": "listar_itens_exemplo"},
             "{}",
             run_id="run-tool-ok",
-            metadata={"langgraph_node": "example_specialist"},
+            metadata={"langgraph_node": "screen_finder"},
         )
         await tracker.on_tool_end("resultado", run_id="run-tool-ok")
 
@@ -242,7 +242,7 @@ def test_step_tracker_on_tool_error_registra_falha_de_tool(monkeypatch):
             {"name": "listar_itens_exemplo"},
             "{}",
             run_id="run-t",
-            metadata={"langgraph_node": "example_specialist"},
+            metadata={"langgraph_node": "screen_finder"},
         )
         await tracker.on_tool_error(RuntimeError("mcp indisponivel"), run_id="run-t")
 
@@ -310,7 +310,7 @@ def test_step_tracker_categoriza_timeout_de_tool_via_httpx(monkeypatch):
             {"name": "listar_itens_exemplo"},
             "{}",
             run_id="run-tool-to",
-            metadata={"langgraph_node": "example_specialist"},
+            metadata={"langgraph_node": "screen_finder"},
         )
         await tracker.on_tool_error(erro, run_id="run-tool-to")
 
@@ -332,7 +332,7 @@ def test_step_tracker_categoriza_connection_error_de_tool_via_httpx(monkeypatch)
             {"name": "listar_itens_exemplo"},
             "{}",
             run_id="run-tool-conn",
-            metadata={"langgraph_node": "example_specialist"},
+            metadata={"langgraph_node": "screen_finder"},
         )
         await tracker.on_tool_error(erro, run_id="run-tool-conn")
 
