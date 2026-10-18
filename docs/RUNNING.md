@@ -10,7 +10,7 @@ Este repositório é Python. O processo local é sempre o mesmo: clonar, criar u
 
 ## Possíveis Impedimentos
 
-- **Python 3.14+ instalado localmente**, exigido pela `solaria-lib` e usado no CI (o `Dockerfile` usa `python:latest`) — rodar fora do container exige essa versão instalada na máquina.
+- **Python 3.12+ instalado localmente**, a mesma versão usada no `Dockerfile` (`python:latest`) — rodar fora do container exige essa versão instalada na máquina.
 - **Acesso ao Google Cloud (`gcloud auth login`)**, serviços que integram com GCP em runtime (Storage, Pub/Sub, Vertex AI) precisam de credenciais válidas localmente, já que em produção isso vem do manifesto do [Infra-gitops](https://github.com/Solierrr/infra-gitops).
 - **Secrets locais**, variáveis de ambiente equivalentes às injetadas em runtime pelo [Infisical](https://infisical.com) (chaves de API de LLM, strings de conexão de banco) precisam ser criadas manualmente em um `.env` local — sem elas, a aplicação sobe mas falha ao tentar se conectar em dependências externas.
 
@@ -47,17 +47,4 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn src.api.app:app --reload
-```
-
-## Telemetria (OpenTelemetry)
-
-O serviço envia traces, métricas e logs por OTLP pelo wrapper `opentelemetry-instrument` (auto-instrumentação de FastAPI e `logging`), sem código na aplicação. Ele só é usado quando `OTEL_SDK_DISABLED=false`; sem isso o serviço sobe como antes. Para ver a telemetria localmente, suba o Grafana local com `make obs-up` no repositório `infra-otel-collector` (ver `docs-warehouse/helps/TRY-LOCAL.md`).
-
-```text
-OTEL_SDK_DISABLED=false
-OTEL_SERVICE_NAME=ai-operational
-OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL_RESOURCE_ATTRIBUTES=service.namespace=solaria,deployment.environment=local
-OTEL_PYTHON_LOG_CORRELATION=true
 ```

@@ -1,4 +1,3 @@
-from ai_lib.registry import RegistryError
 from groq import GroqError
 from langchain_core.messages import AIMessage, SystemMessage
 from pydantic import BaseModel
@@ -94,7 +93,7 @@ def router_node(state: GraphState, runnable_config=None) -> dict:
     try:
         resposta = llm_groq().invoke(messages_with_context, config=runnable_config)
         decisao = _parse_decisao_roteamento(resposta.content)
-    except (GroqError, RegistryError, ValueError, TypeError, AttributeError):
+    except (GroqError, ValueError, TypeError, AttributeError):
         # O orquestrador consegue compor uma resposta a partir do contexto;
         # e preferivel a encerrar silenciosamente com uma saida malformada.
         return {

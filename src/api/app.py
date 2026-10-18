@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.api.routes import chat
-from src.core.config.settings import settings
+from src.core.llm.keys import key_client
 from src.infra.database.mongo.indexes.user_memory_indexes import (
     ensure_user_memory_indexes,
 )
@@ -28,11 +28,12 @@ app.include_router(chat.router)
 @app.get("/health")
 def health() -> dict:
     """Responde 'ok' se o servidor subiu, listando configuração ausente."""
-    missing = []
-    if not settings.REGISTRY_URL:
-        missing.append("REGISTRY_URL")
-    if not settings.REGISTRY_CONSUMER_TOKEN:
-        missing.append("REGISTRY_CONSUMER_TOKEN")
+    configured = key_client().providers()
+    missing = [
+        f"{provider.upper()}_API_KEY"
+        for provider in ("gemini", "groq")
+        if provider not in configured
+    ]
 
     return {
         "status": "ok" if not missing else "atencao",
