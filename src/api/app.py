@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.a2a.server import mount as mount_a2a
 from src.api.routes import chat
 from src.core.llm.keys import key_client
 from src.infra.database.mongo.indexes.user_memory_indexes import (
@@ -23,6 +24,7 @@ app = FastAPI(
 )
 
 app.include_router(chat.router)
+mount_a2a(app)
 
 
 @app.get("/health")

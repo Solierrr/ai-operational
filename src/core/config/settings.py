@@ -21,6 +21,9 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
 
+    # A2A: URL pública deste serviço, anunciada no Agent Card.
+    A2A_PUBLIC_URL: str = "http://localhost:8003"
+
     TEST_USER_TOKEN: str | None = (
         None  # só pra uso local via main.py, nunca em produção
     )
