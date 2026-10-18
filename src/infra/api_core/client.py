@@ -71,20 +71,15 @@ class ApiCoreClient:
 
     async def my_suppliers(self) -> list[SupplierRef]:
         """Empresas fornecedoras às quais o usuário pertence."""
-        memberships = (await self._request("GET", "/user-companies/me/all")).json()
+        perfil = (await self._request("GET", "/users/me")).json()
         refs: list[SupplierRef] = []
-        for membership in memberships:
+        for membership in perfil.get("companyMemberships") or []:
             company_id = membership["companyId"]
             suppliers = (
                 await self._request("GET", f"/suppliers/company/{company_id}")
             ).json()
             for supplier in suppliers:
-                company = supplier.get("company") or {}
-                name = (
-                    company.get("tradeName")
-                    or company.get("corporateName")
-                    or "Sua empresa"
-                )
+                name = membership.get("companyName") or "Sua empresa"
                 refs.append(SupplierRef(supplier["id"], company_id, name))
         return refs
 
