@@ -17,8 +17,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="[NOME_DO_PROJETO] API",
-    description="[preencha: descrição curta do assistente de IA e do domínio que ele atende]",
+    title="Solaria Operacional API",
+    description="Agente que ajuda a operar o SaaS: acha telas e propõe ações com aprovação do usuário.",
     version="0.1.0",
     lifespan=lifespan,
 )

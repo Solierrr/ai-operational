@@ -79,3 +79,54 @@ def test_delegacao_a2a_chega_ao_turno_do_agente(monkeypatch):
     assert result.text == "Vou cadastrar a placa X. Aceita?"
     assert execute_turn.await_args.args[1] == "cadastra a placa X"
     assert execute_turn.await_args.kwargs == {"user_token": "jwt"}
+
+
+def test_proposta_pendente_vira_input_required(monkeypatch):
+    execute_turn = _fake_graph_modules(monkeypatch)
+    execute_turn.return_value = {
+        "messages": [AIMessage(content="Posso cadastrar esta oferta. Você aceita?")],
+        "pending_proposal": {"action": "create_offer"},
+    }
+
+    reply = asyncio.run(
+        server.handle_turn(TurnRequest("cadastra a placa X", "jwt", "demandante", "c1"))
+    )
+
+    assert reply.needs_input is True
+
+
+def test_resposta_sem_proposta_pendente_conclui_a_tarefa(monkeypatch):
+    _fake_graph_modules(monkeypatch)
+
+    reply = asyncio.run(
+        server.handle_turn(TurnRequest("oi", "jwt", "demandante", "c1"))
+    )
+
+    assert reply.needs_input is False
+
+
+def test_proposta_pendente_chega_ao_delegante_como_input_required(monkeypatch):
+    execute_turn = _fake_graph_modules(monkeypatch)
+    execute_turn.return_value = {
+        "messages": [AIMessage(content="Posso cadastrar esta oferta. Você aceita?")],
+        "pending_proposal": {"action": "create_offer"},
+    }
+    app = FastAPI()
+    server.mount(app)
+
+    async def run():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            headers={"Authorization": "Bearer jwt"},
+        ) as http:
+            return await delegate(
+                server.settings.A2A_PUBLIC_URL,
+                "cadastra a placa X",
+                token="jwt",
+                http_client=http,
+            )
+
+    resultado = asyncio.run(run())
+
+    assert resultado.outcome == "input_required"
+    assert resultado.text == "Posso cadastrar esta oferta. Você aceita?"

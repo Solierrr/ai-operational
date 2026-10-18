@@ -57,7 +57,11 @@ async def handle_turn(request: TurnRequest) -> TurnReply:
         compiled_app,
         user_token=request.token,
     )
-    return TurnReply(text=str(final_state["messages"][-1].content))
+    # Uma proposta pendente espera a decisão do usuário: estado A2A "input_required".
+    return TurnReply(
+        text=str(final_state["messages"][-1].content),
+        needs_input=bool(final_state.get("pending_proposal")),
+    )
 
 
 def mount(app: FastAPI) -> None:
