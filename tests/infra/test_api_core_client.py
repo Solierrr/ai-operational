@@ -23,12 +23,22 @@ def _client(handler) -> tuple[ApiCoreClient, list[httpx.Request]]:
 
 def test_fornecedores_do_usuario_seguem_vinculos_e_empresas():
     def handler(request):
-        if request.url.path == "/api/user-companies/me/all":
-            return httpx.Response(200, json=[{"companyId": "c1"}, {"companyId": "c2"}])
-        if request.url.path == "/api/suppliers/company/c1":
+        if request.url.path == "/api/users/me":
             return httpx.Response(
-                200, json=[{"id": "s1", "company": {"tradeName": "ACME"}}]
+                200,
+                json={
+                    "companyMemberships": [
+                        {"companyId": "c1", "companyName": "ACME", "position": "ADMIN"},
+                        {
+                            "companyId": "c2",
+                            "companyName": "Outra",
+                            "position": "MEMBER",
+                        },
+                    ]
+                },
             )
+        if request.url.path == "/api/suppliers/company/c1":
+            return httpx.Response(200, json=[{"id": "s1"}])
         return httpx.Response(200, json=[])
 
     client, vistos = _client(handler)
