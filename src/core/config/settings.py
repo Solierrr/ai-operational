@@ -21,6 +21,13 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
 
+    CORS_ALLOWED_ORIGINS: str = (
+        "http://localhost:5173,http://localhost:3000,http://localhost:5174,"
+        "http://127.0.0.1:5174,https://web-sandbox-7ug0.onrender.com"
+    )
+
+    DEBUG_ADMIN_SUBS: str = ""
+
     # api-core: onde as ações aprovadas pelo usuário são executadas, com o JWT dele.
     API_CORE_URL: str = "http://localhost:8080/api"
 
