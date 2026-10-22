@@ -8,3 +8,4 @@ from contextvars import ContextVar
 current_user_token: ContextVar[str | None] = ContextVar(
     "current_user_token", default=None
 )
+debug_dry_run: ContextVar[bool] = ContextVar("debug_dry_run", default=False)
