@@ -8,7 +8,7 @@ from src.agents.specialist.action_proposer.action_proposer_prompt import (
     DECISION_PROMPT,
     QUESTION_PROMPT,
 )
-from src.core.security.request_context import current_user_token
+from src.core.security.request_context import current_user_token, debug_dry_run
 from src.infra.api_core.client import ApiCoreClient, ApiCoreError
 from src.workflow.nodes.llm_json import InvalidJsonReply, ask_json, ask_text
 from src.workflow.nodes.replies import reply
@@ -22,6 +22,7 @@ _SEM_TOKEN = (
     "Para executar a ação é preciso estar autenticado. A proposta foi descartada."
 )
 _RECUSADO = "Tudo bem, não cadastrei nada."
+_SIMULADO = "[Modo debug] Simulação: a oferta seria cadastrada agora, mas nada foi gravado no api-core."
 _REFAZER = (
     "Não consegui validar essa proposta. Pode me pedir de novo o que quer cadastrar?"
 )
@@ -62,6 +63,8 @@ async def proposal_decision_node(state: GraphState, config=None) -> dict:
         token = current_user_token.get()
         if not token:
             return reply(state, AGENT, _SEM_TOKEN, pending_proposal=None)
+        if debug_dry_run.get():
+            return reply(state, AGENT, _SIMULADO, pending_proposal=None)
         payload = pendente["payload"]
         try:
             criada = await ApiCoreClient(token).create_offer(payload)

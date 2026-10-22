@@ -10,7 +10,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from src.core.security.request_context import current_user_token
+from src.core.security.request_context import current_user_token, debug_dry_run
 from src.infra.api_core.client import SupplierRef
 
 DADOS = {
@@ -131,3 +131,17 @@ def test_aceite_repetido_depois_de_executar_nao_grava_duas_vezes(app, monkeypatc
 
     client.create_offer.assert_awaited_once()
     assert terceiro["pending_proposal"] is None
+
+
+def test_aceite_em_modo_debug_simula_e_nao_grava_no_api_core(app):
+    compiled, client = app
+    token = debug_dry_run.set(True)
+    try:
+        _turno(compiled, "cadastra a Canadian CS6R a 900,50 com 40 unidades")
+        segundo = _turno(compiled, "sim")
+    finally:
+        debug_dry_run.reset(token)
+
+    client.create_offer.assert_not_awaited()
+    assert "[Modo debug] Simulação" in segundo["messages"][-1].content
+    assert segundo["pending_proposal"] is None
