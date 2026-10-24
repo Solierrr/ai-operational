@@ -8,7 +8,7 @@ Agente Roteador. Os especialistas são o Localizador de Telas (`screen_finder`, 
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,langchain,mongodb,redis" height="48" alt="Arquitetura">
+    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,langchain,mongodb" height="48" alt="Arquitetura">
   </a>
 </p>
 
@@ -17,7 +17,7 @@ Agente Roteador. Os especialistas são o Localizador de Telas (`screen_finder`, 
   `orchestrator` → `judge` → `output_guardrail`.
 - Cada especialista de domínio vive em `src/agents/specialist/<nome>/` (prompt)
   e `src/workflow/nodes/<nome>_node.py` (node).
-- Integrações de infraestrutura ficam em `src/infra/` (Mongo, Redis, MCP,
+- Integrações de infraestrutura ficam em `src/infra/` (Mongo, MCP,
   api-messenger); nenhuma delas depende do domínio específico do assistente.
 - Autenticação via JWT emitido pelo `api-auth` (`src/core/security/jwt.py`).
 
@@ -28,7 +28,7 @@ Agente Roteador. Os especialistas são o Localizador de Telas (`screen_finder`, 
 │   ├── agents/       # framework base + especialistas
 │   ├── api/          # FastAPI (rotas, schemas)
 │   ├── core/         # config, llm, guardrails, logging, security
-│   ├── infra/        # clientes de infraestrutura (mongo, redis, mcp, api-messenger)
+│   ├── infra/        # clientes de infraestrutura (mongo, mcp, api-messenger)
 │   ├── memory/        # checkpointer de sessão
 │   └── workflow/     # grafo LangGraph, nodes, state
 ├── tests/
