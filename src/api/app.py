@@ -10,6 +10,7 @@ from src.core.llm.keys import key_client
 from src.infra.database.mongo.indexes.user_memory_indexes import (
     ensure_user_memory_indexes,
 )
+from src.version import VERSION
 
 
 def cors_origins(raw: str) -> list[str]:
@@ -25,7 +26,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Solaria Operacional API",
     description="Agente que ajuda a operar o SaaS: acha telas e propõe ações com aprovação do usuário.",
-    version="0.1.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 

@@ -12,6 +12,7 @@ from ai_lib.a2a import (
 from fastapi import FastAPI
 
 from src.core.config.settings import settings
+from src.version import VERSION
 
 _SEM_TOKEN = "É preciso estar autenticado para executar ações na plataforma."
 
@@ -37,7 +38,7 @@ def build_card():
     return build_agent_card(
         name="Agente Operacional Solaria",
         description="Executa ações no SaaS em nome do usuário, com aprovação antes de gravar.",
-        version="0.1.0",
+        version=VERSION,
         base_url=settings.A2A_PUBLIC_URL,
         skills=SKILLS,
     )
