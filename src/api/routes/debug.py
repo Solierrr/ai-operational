@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import Field
 
+from src.api.routes.chat import chat_response
 from src.api.schemas.chat import ChatRequest, ChatResponse
 from src.core.config.settings import settings
 from src.core.security.jwt import decode_user_id
@@ -99,17 +100,8 @@ async def conversar_com_debug(
             },
         )
 
-    final_message = final_state["messages"][-1]
-    metadata = final_message.additional_kwargs
     debug = collector.snapshot()
     debug["environment"] = settings.ENVIRONMENT
     debug["persisted"] = False
     debug["dry_run"] = True
-    return DebugChatResponse(
-        response=final_message.content,
-        specialists_used=metadata.get("specialists_used", []),
-        workflow_steps=metadata.get(
-            "workflow_steps", final_state.get("turn_agents", [])
-        ),
-        debug=debug,
-    )
+    return DebugChatResponse(**chat_response(final_state, debug=debug))
