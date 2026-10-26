@@ -8,6 +8,7 @@ from src.agents.base.base_prompt import build_system_prompt
 from src.core.guardrails.anonymize import deanonymize_text
 from src.core.guardrails.prompt import _PROMPT_COMPLIANCE
 from src.core.llm.llm_groq import llm_groq
+from src.workflow.outcome import Outcome, Reason, outcome_kwargs
 from src.workflow.state import GraphState
 from src.workflow.turn_tracking import append_turn_agent, specialists_used
 
@@ -68,6 +69,7 @@ def output_guardrail_node(state: GraphState, config=None) -> dict:
         "STATUS: APROVADO ou CORRIGIDO\nRESPOSTA: <texto final, ja revisado>"
     )
 
+    degraded: dict = {}
     try:
         resposta = llm_groq().invoke(
             [HumanMessage(content=formatted_prompt)], config=config
@@ -79,6 +81,7 @@ def output_guardrail_node(state: GraphState, config=None) -> dict:
         # resposta nao revisada sair - troca por uma mensagem generica
         logger.warning("Falha ao avaliar output_guardrail: %s", erro)
         final_text = FALLBACK_RESPONSE
+        degraded = outcome_kwargs(Outcome.DEGRADED, Reason.GUARDRAIL_UNAVAILABLE)
 
     workflow_steps = append_turn_agent(state, "output_guardrail")
 
@@ -90,6 +93,7 @@ def output_guardrail_node(state: GraphState, config=None) -> dict:
                 additional_kwargs={
                     "specialists_used": specialists_used(workflow_steps),
                     "workflow_steps": workflow_steps,
+                    **degraded,
                 },
             ),
         ],

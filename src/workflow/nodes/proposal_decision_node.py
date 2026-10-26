@@ -12,6 +12,7 @@ from src.core.security.request_context import current_user_token, debug_dry_run
 from src.infra.api_core.client import ApiCoreClient, ApiCoreError
 from src.workflow.nodes.llm_json import InvalidJsonReply, ask_json, ask_text
 from src.workflow.nodes.replies import reply
+from src.workflow.outcome import Outcome, Reason
 from src.workflow.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ async def proposal_decision_node(state: GraphState, config=None) -> dict:
                 state,
                 AGENT,
                 f"Não consegui cadastrar a oferta. {erro.message}",
+                outcome=(Outcome.TOOL_FAILED, Reason.ACTION_FAILED),
                 pending_proposal=None,
             )
         return reply(

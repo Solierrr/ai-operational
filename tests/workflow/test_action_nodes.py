@@ -156,6 +156,8 @@ def test_falha_do_api_core_vira_mensagem_sem_proposta(monkeypatch):
 
     assert "indisponível" in result["messages"][0].content
     assert "pending_proposal" not in result
+    assert result["messages"][0].additional_kwargs["outcome"] == "TOOL_FAILED"
+    assert result["messages"][0].additional_kwargs["reason"] == "ACTION_FAILED"
 
 
 def test_sem_token_nao_propoe(monkeypatch):
@@ -279,6 +281,8 @@ def test_erro_do_api_core_ao_executar_descarta_e_explica(monkeypatch):
     assert "Não consegui cadastrar" in result["messages"][0].content
     assert "permissão" in result["messages"][0].content
     assert result["pending_proposal"] is None
+    assert result["messages"][0].additional_kwargs["outcome"] == "TOOL_FAILED"
+    assert result["messages"][0].additional_kwargs["reason"] == "ACTION_FAILED"
 
 
 def test_aceite_sem_token_descarta_a_proposta(monkeypatch):

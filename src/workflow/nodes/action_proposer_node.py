@@ -11,6 +11,7 @@ from src.core.security.request_context import current_user_token
 from src.infra.api_core.client import ApiCoreClient, ApiCoreError
 from src.workflow.nodes.llm_json import InvalidJsonReply, ask_json
 from src.workflow.nodes.replies import reply
+from src.workflow.outcome import Outcome, Reason
 from src.workflow.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,12 @@ async def action_proposer_node(state: GraphState, config=None) -> dict:
 
         modelos = await client.approved_models()
     except ApiCoreError as erro:
-        return reply(state, AGENT, erro.message)
+        return reply(
+            state,
+            AGENT,
+            erro.message,
+            outcome=(Outcome.TOOL_FAILED, Reason.ACTION_FAILED),
+        )
 
     candidatos = offer.match_models(rascunho.modelo, modelos)
     if not candidatos:
