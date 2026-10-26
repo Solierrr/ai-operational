@@ -9,13 +9,22 @@ from src.core.config.settings import settings
 _tools_cache: list | None = None
 
 
+def _headers() -> dict[str, str]:
+    """X-Service-Key com a chave própria; o x-api-key antigo vai junto só enquanto
+    MCP_API_KEY estiver definida, até o mcp-database exigir a chave de serviço."""
+    headers = {"X-Service-Key": settings.SERVICE_KEY} if settings.SERVICE_KEY else {}
+    if settings.MCP_API_KEY:
+        headers["x-api-key"] = settings.MCP_API_KEY
+    return headers
+
+
 async def _carregar_tools() -> list:
     client = MultiServerMCPClient(
         {
             "mcp-database": {
                 "url": settings.MCP_URL,
                 "transport": "streamable_http",
-                "headers": {"x-api-key": settings.MCP_API_KEY},
+                "headers": _headers(),
             }
         }
     )
