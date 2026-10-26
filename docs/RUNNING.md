@@ -48,3 +48,7 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn src.api.app:app --reload
 ```
+
+## Autenticação local
+
+O JWT de usuário vem do `api-auth` de verdade, sem emissor falso: suba a stack local com `make dev-up` no `database-console` e aponte `JWT_JWKS_URL` para o JWKS dele (`http://localhost:8081/.well-known/jwks.json`). Para conversar pelo terminal, rode `python main.py` e informe o access token obtido no login do `api-auth` local.
