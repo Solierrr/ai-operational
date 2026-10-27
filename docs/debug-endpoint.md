@@ -53,7 +53,7 @@ O token do usuário é repassado ao turno como no `/chat`, então as consultas a
   "workflow_steps": ["router", "action_proposer"],
   "debug": {
     "environment": "QA",
-    "persisted": false,
+    "persisted": true,
     "dry_run": true,
     "duration_ms": 1840.2,
     "route": "action_proposer",
@@ -165,15 +165,11 @@ Reexecuta só um nó de um turno já feito, com os prompts `system` trocados, e 
   o prompt não deve ser editado.
 - Os demais textos (entrada e saída dos nós, resposta do LLM) são cortados em 4.000
   caracteres; quando algo é cortado, `truncated` é `true`.
-- Nada do debug é persistido: ele existe só na resposta do turno.
+- O trace dos nós existe só na resposta do turno e não é guardado. O que o turno normal grava no `api-messenger` (conversa, mensagens e steps) está em "O que o modo debug grava e não grava".
 
-## O que o modo debug não grava
+## O que o modo debug grava e não grava
 
-O turno roda com `persist=False`: não cria conversa nem grava mensagens no
-`api-messenger`, não registra os steps de observabilidade, não lê nem atualiza a
-memória de longo prazo e não grava no `api-core`. Uma ressalva: o estado do grafo
-continua indo para o checkpointer, na thread `debug:<sub>:<conversation_id>`,
-separada das conversas reais.
+O turno normal roda com `persist=False, save_history=True`: cria a conversa e grava a mensagem do usuário, a resposta e os steps de observabilidade no `api-messenger` (a conversa nasce com `userDetails.source = "debug"`, `assistant` e `threadId`, para aparecer em Conversas e Dashboards e ser filtrada do uso real), mas não lê nem atualiza a memória de longo prazo e não grava no `api-core`. A execução personalizada de um nó não grava nada. Uma ressalva: o estado do grafo continua indo para o checkpointer, na thread `debug:<sub>:<conversation_id>`, separada das conversas reais.
 
 ## CORS
 
