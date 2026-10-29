@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from src.api.auth import require_valid_token
 from src.api.schemas.chat import ChatRequest, ChatResponse
+from src.core.security.conversation_access import ConversationAccessDenied
 from src.workflow.runner import execute_turn
 
 router = APIRouter(tags=["chat"])
@@ -21,12 +22,17 @@ async def conversar(
 
     from src.workflow.graph.graph import compiled_app
 
-    final_state = await execute_turn(
-        requisicao.conversation_id,
-        requisicao.message,
-        compiled_app,
-        user_token=user_token,
-    )
+    try:
+        final_state = await execute_turn(
+            requisicao.conversation_id,
+            requisicao.message,
+            compiled_app,
+            user_token=user_token,
+        )
+    except ConversationAccessDenied as erro:
+        raise HTTPException(
+            status_code=403, detail="Esta conversa não pertence a você."
+        ) from erro
     final_message = final_state["messages"][-1]
     metadata = final_message.additional_kwargs
 
