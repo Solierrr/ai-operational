@@ -1,11 +1,18 @@
 import asyncio
 import logging
+import weakref
 from collections.abc import Sequence
 from uuid import uuid4
 
 from langchain_core.messages import HumanMessage
 
+from src.core.config.settings import settings
 from src.core.guardrails.anonymize import anonymize_text
+from src.core.observability.langsmith_tracing import build_tracer
+from src.core.security.conversation_access import (
+    ConversationAccessDenied,
+    thread_key,
+)
 from src.core.security.jwt import decode_user_id
 from src.core.security.request_context import current_user_token, debug_dry_run
 from src.infra.api_messenger.client import (
@@ -26,6 +33,31 @@ logger = logging.getLogger(__name__)
 ASSISTANT_ID = "operational"
 _conversations_por_thread: dict[str, str] = {}
 _background_tasks: set[asyncio.Task] = set()
+_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+
+
+def _lock_for(conversation_id: str) -> asyncio.Lock:
+    lock = _locks.get(conversation_id)
+    if lock is None:
+        lock = _locks[conversation_id] = asyncio.Lock()
+    return lock
+
+
+async def _require_owner(workflow, conversation_id: str, user_id: str | None) -> None:
+    if not user_id:
+        if settings.ENVIRONMENT.upper() == "LOCAL":
+            return
+        raise ConversationAccessDenied("Nao foi possivel identificar o usuario.")
+    try:
+        snapshot = await workflow.aget_state(
+            {"configurable": {"thread_id": thread_key(conversation_id)}}
+        )
+        owner = (snapshot.values or {}).get("user_id")
+    except Exception:
+        logger.warning("Nao foi possivel ler o dono da conversa", exc_info=True)
+        return
+    if owner and str(owner).lower() != user_id.lower():
+        raise ConversationAccessDenied("Esta conversa pertence a outro usuario.")
 
 
 async def _atualizar_memoria(
@@ -84,6 +116,30 @@ async def execute_turn(
     save_history: bool = False,
     extra_callbacks: Sequence = (),
 ) -> dict:
+    """Um turno por vez em cada conversa: dois "sim" ao mesmo tempo não executam a
+    mesma proposta duas vezes."""
+    async with _lock_for(conversation_id):
+        return await _execute_turn(
+            conversation_id,
+            user_input,
+            workflow,
+            user_token,
+            persist=persist,
+            save_history=save_history,
+            extra_callbacks=extra_callbacks,
+        )
+
+
+async def _execute_turn(
+    conversation_id: str,
+    user_input: str,
+    workflow,
+    user_token: str,
+    *,
+    persist: bool = True,
+    save_history: bool = False,
+    extra_callbacks: Sequence = (),
+) -> dict:
     """Roda um turno do grafo.
 
     `persist=False` (modo debug) não lê nem atualiza a memória de longo prazo,
@@ -94,6 +150,8 @@ async def execute_turn(
     saves = persist or save_history
     current_user_token.set(user_token)
     debug_dry_run.set(not persist)
+    user_id = await asyncio.to_thread(decode_user_id, user_token)
+    await _require_owner(workflow, conversation_id, user_id)
     turn_id = str(uuid4())
     api_conversation_id: str | None = None
     tracker: StepTracker | None = None
@@ -115,10 +173,10 @@ async def execute_turn(
 
         tracker = StepTracker(conversation_id=api_conversation_id)
 
-    user_id = await asyncio.to_thread(decode_user_id, user_token)
     fatos_existentes = await get_user_memory(user_id) if persist and user_id else []
     user_memory = "\n".join(f"- {fato}" for fato in fatos_existentes)
 
+    tracer = build_tracer()
     final_state = await workflow.ainvoke(
         {
             "messages": [HumanMessage(content=user_input)],
@@ -130,8 +188,19 @@ async def execute_turn(
             "user_memory": user_memory,
         },
         config={
-            "configurable": {"thread_id": conversation_id},
-            "callbacks": [*([tracker] if tracker else []), *extra_callbacks],
+            "configurable": {"thread_id": thread_key(conversation_id)},
+            "callbacks": [
+                *([tracker] if tracker else []),
+                *([tracer] if tracer else []),
+                *extra_callbacks,
+            ],
+            "metadata": {
+                "conversation_id": api_conversation_id or conversation_id,
+                "environment": settings.ENVIRONMENT,
+                "assistant": "ai-operational",
+                "source": "chat" if persist else "debug",
+            },
+            "tags": [settings.ENVIRONMENT.lower()],
         },
     )
 
@@ -141,7 +210,9 @@ async def execute_turn(
     final_message = final_state["messages"][-1]
     anonymized_assistant_response, _ = anonymize_text(final_message.content)
     message_metadata = final_message.additional_kwargs
-    thread_turn = None if persist else await _thread_turn(workflow, conversation_id)
+    thread_turn = (
+        None if persist else await _thread_turn(workflow, thread_key(conversation_id))
+    )
     audit_metadata = {
         "turnId": turn_id,
         "contentAnonymized": True,
@@ -175,18 +246,20 @@ async def execute_single_node(
 ):
     current_user_token.set(user_token)
     debug_dry_run.set(True)
+    tracer = build_tracer()
     return await run_single_node(
         workflow,
-        thread_id,
+        thread_key(thread_id),
         turn=turn,
         node=node,
         occurrence=occurrence,
         overrides=overrides,
-        callbacks=[*extra_callbacks],
+        callbacks=[*extra_callbacks, *([tracer] if tracer else [])],
         metadata={
             "conversation_id": thread_id,
+            "environment": settings.ENVIRONMENT,
             "assistant": "ai-operational",
             "source": "debug-replay",
         },
-        tags=[],
+        tags=[settings.ENVIRONMENT.lower()],
     )

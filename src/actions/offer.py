@@ -6,11 +6,18 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from src.actions import base
+from src.agents.specialist.action_proposer.action_proposer_prompt import (
+    OFFER_EXTRACTION_PROMPT,
+)
+from src.core.security.untrusted import REMOVIDO
 from src.domain.text import normalize
-from src.infra.api_core.client import SupplierRef
+from src.infra.api_core.client import ApiCoreClient, SupplierRef
 
 ACTION = "create_offer"
-MAX_OPCOES = 5
+MAX_OPCOES = base.MAX_OPCOES
+TITULO_MAX = 80
+DESCRICAO_MAX = 200
 
 CAMPOS_OBRIGATORIOS = {
     "modelo": 'o modelo da placa (marca e modelo, por exemplo "Canadian CS6R 550")',
@@ -91,36 +98,97 @@ def default_description(model: dict) -> str:
     return f"Placa solar {model_label(model)} disponível para venda."
 
 
+def _texto_gravavel(value: str | None, padrao: str, limite: int) -> str:
+    texto = base.safe(value, limite) if value else ""
+    if not texto or texto == REMOVIDO:
+        return base.safe(padrao, limite)
+    return texto
+
+
 def build_payload(draft: OfferDraft, model: dict, supplier: SupplierRef) -> dict:
     return {
         "supplierId": supplier.supplier_id,
         "modelId": model["id"],
-        "title": draft.titulo or default_title(model),
-        "description": draft.descricao or default_description(model),
+        "title": _texto_gravavel(draft.titulo, default_title(model), TITULO_MAX),
+        "description": _texto_gravavel(
+            draft.descricao, default_description(model), DESCRICAO_MAX
+        ),
         "unitPrice": float(draft.preco_unitario),
         "availability": draft.disponibilidade,
     }
 
 
 def _brl(value: float) -> str:
-    return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return base.brl(value)
 
 
 def render_proposal(payload: dict, model: dict, supplier: SupplierRef) -> str:
     return (
         "Posso cadastrar esta oferta, mas só depois do seu aceite:\n\n"
-        f"- Empresa: {supplier.company_name}\n"
-        f"- Placa: {model_label(model)}\n"
-        f"- Título: {payload['title']}\n"
-        f"- Descrição: {payload['description']}\n"
+        f"- Empresa: {base.safe(supplier.company_name)}\n"
+        f"- Placa: {base.safe(model_label(model))}\n"
+        f"- Título: {base.safe(payload['title'], TITULO_MAX)}\n"
+        f"- Descrição: {base.safe(payload['description'], DESCRICAO_MAX)}\n"
         f"- Preço unitário: {_brl(payload['unitPrice'])}\n"
-        f"- Disponibilidade: {payload['availability']} unidades\n\n"
-        'Você aceita? Responda "sim" para cadastrar, "não" para cancelar, ou me diga o que quer ajustar.'
+        f"- Disponibilidade: {payload['availability']} unidades"
     )
 
 
 def render_success(offer: dict, payload: dict) -> str:
     return (
-        f'Pronto, a oferta "{payload["title"]}" foi cadastrada '
+        f'Pronto, a oferta "{base.safe(payload["title"])}" foi cadastrada '
         f"por {_brl(payload['unitPrice'])} com {payload['availability']} unidades."
     )
+
+
+SEM_FORNECEDOR = (
+    "Sua conta não está ligada a uma empresa fornecedora, então não posso cadastrar ofertas. "
+    "Cadastre a empresa pela tela de cadastro de empresa (`/pt-BR/cadastro/empresa`) e peça de novo."
+)
+
+
+async def prepare(draft: OfferDraft, client: ApiCoreClient) -> base.Ask | base.Ready:
+    faltando = missing_fields(draft)
+    if faltando:
+        itens = "\n".join(f"- {item}" for item in faltando)
+        return base.Ask(f"Para cadastrar a oferta ainda preciso saber:\n{itens}")
+
+    fornecedores = await client.my_suppliers()
+    if not fornecedores:
+        return base.Ask(SEM_FORNECEDOR)
+    escolhido = pick_supplier(draft, fornecedores)
+    if isinstance(escolhido, list):
+        nomes = "\n".join(f"- {base.safe(s.company_name)}" for s in escolhido)
+        return base.Ask(f"Em qual empresa devo cadastrar a oferta?\n{nomes}")
+
+    modelos = await client.approved_models()
+    candidatos = match_models(draft.modelo, modelos)
+    if not candidatos:
+        return base.Ask(
+            f'Não encontrei "{base.safe(draft.modelo)}" entre os modelos aprovados do catálogo. '
+            "Se o modelo ainda não existe, cadastre-o na tela de modelos de placa "
+            "(`/pt-BR/admin/modelos-de-placa-solar`) e peça de novo."
+        )
+    if len(candidatos) > 1:
+        opcoes = base.options_text([base.safe(model_label(m)) for m in candidatos])
+        return base.Ask(f"Encontrei mais de um modelo. Qual deles?\n{opcoes}")
+
+    modelo = candidatos[0]
+    payload = build_payload(draft, modelo, escolhido)
+    return base.Ready(payload, render_proposal(payload, modelo, escolhido))
+
+
+async def execute(client: ApiCoreClient, payload: dict) -> dict:
+    return await client.create_offer(payload)
+
+
+SPEC = base.ActionSpec(
+    name=ACTION,
+    descricao="create_offer: cadastrar uma oferta de placa solar da empresa (modelo, preço e quantidade).",
+    prompt=OFFER_EXTRACTION_PROMPT,
+    draft_model=OfferDraft,
+    prepare=prepare,
+    execute=execute,
+    success=render_success,
+    recusado="Tudo bem, não cadastrei nada.",
+)

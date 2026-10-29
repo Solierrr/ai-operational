@@ -11,3 +11,4 @@ class GraphState(MessagesState):
     user_id: str | None
     user_memory: str
     pending_proposal: dict | None
+    writes_done: int

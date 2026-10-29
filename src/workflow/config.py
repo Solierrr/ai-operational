@@ -9,5 +9,7 @@ SPECIALIST_ROUTES: Final[frozenset[str]] = frozenset(
     {
         "screen_finder",
         "action_proposer",
+        "how_to_guide",
+        "data_reader",
     }
 )

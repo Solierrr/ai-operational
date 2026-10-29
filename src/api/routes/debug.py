@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from src.api.schemas.chat import ChatRequest, ChatResponse
 from src.core.config.settings import settings
+from src.core.security.conversation_access import thread_key
 from src.core.security.jwt import decode_user_id
 from src.workflow.debug_replay import ReplayError, count_turns
 from src.workflow.observability.debug_tracker import DebugTracker, mask_pii
@@ -84,7 +85,7 @@ def debug_enabled() -> bool:
 
 async def _last_turn(workflow, thread_id: str) -> int | None:
     try:
-        return await count_turns(workflow, thread_id) - 1
+        return await count_turns(workflow, thread_key(thread_id)) - 1
     except Exception:
         logger.warning(
             "Não foi possível contar os turnos de %s", thread_id, exc_info=True
