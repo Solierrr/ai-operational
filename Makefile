@@ -4,6 +4,10 @@
 
 # ---- especifico deste repositorio ----
 VAULT_FOLDERS ?= /database /llm /service-urls /mcp /service-keys
+# /observability (LangSmith) so existe no QA; Local e Production ainda tem /obervability.
+ifeq ($(ENV),qa)
+VAULT_FOLDERS += /observability
+endif
 ifeq ($(OS),Windows_NT)
 PY ?= .venv/Scripts/python
 else

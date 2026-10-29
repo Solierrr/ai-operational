@@ -8,7 +8,7 @@ segmento novo, em `ROUTE_SEGMENTS`.
 
 from dataclasses import dataclass
 
-from src.domain.text import normalize
+from src.domain.text import stems
 
 DEFAULT_LANG = "pt-BR"
 
@@ -521,18 +521,7 @@ SCREENS: tuple[Screen, ...] = (
 )
 
 
-_STOPWORDS = frozenset(
-    ["onde", "como", "quero", "para", "uma", "uns", "umas", "meu", "minha", "meus", "minhas", "que", "com", "dos", "das", "por", "fazer", "ver", "tela", "telas", "pagina", "paginas", "achar", "acho", "encontrar", "preciso", "posso", "qual", "quais", "aonde", "fica", "ficam", "esta", "estao", "nao", "sei", "gostaria", "queria", "mostrar", "abrir", "ir", "levar"]
-)
-
-
-def _stems(text: str) -> set[str]:
-    """Radicais de 4 letras das palavras relevantes (cadastro, cadastrar -> cada)."""
-    return {
-        token[:4]
-        for token in normalize(text).split()
-        if len(token) > 2 and token not in _STOPWORDS
-    }
+_stems = stems
 
 
 def find_screens(query: str, lang: str = DEFAULT_LANG, limit: int = 3) -> list[dict]:

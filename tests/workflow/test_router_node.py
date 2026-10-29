@@ -58,9 +58,13 @@ def test_router_routes_to_second_specialist(monkeypatch):
 def test_router_returns_direct_response(monkeypatch):
     llm = _mock_llm(None, "Posso ajudar com essa informacao diretamente.")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
-    result = router_node.router_node({"messages": [HumanMessage(content="Uma duvida qualquer")]})
+    result = router_node.router_node(
+        {"messages": [HumanMessage(content="Uma duvida qualquer")]}
+    )
     assert result["route"] == "end"
-    assert result["messages"][0].content == "Posso ajudar com essa informacao diretamente."
+    assert (
+        result["messages"][0].content == "Posso ajudar com essa informacao diretamente."
+    )
 
 
 def test_router_short_circuits_at_specialist_limit(monkeypatch):
@@ -91,7 +95,7 @@ def test_router_only_offers_unused_routes(monkeypatch):
 
     messages = llm.invoke.call_args.args[0]
     assert (
-        "Rotas disponiveis nesta solicitacao: action_proposer."
+        "Rotas disponiveis nesta solicitacao: action_proposer, data_reader, how_to_guide."
         in messages[1].content
     )
     assert "Resumo" in messages[2].content
@@ -109,7 +113,10 @@ def test_router_falls_back_for_malformed_response(monkeypatch):
     llm.invoke.return_value = AIMessage(content="Escolha screen_finder")
     monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
     result = router_node.router_node({"messages": [HumanMessage(content="Ajuda")]})
-    assert result == {"route": "orchestrator", "turn_agents": ["router_invalid_response"]}
+    assert result == {
+        "route": "orchestrator",
+        "turn_agents": ["router_invalid_response"],
+    }
 
 
 def test_router_falls_back_when_direct_response_is_empty(monkeypatch):
@@ -118,4 +125,7 @@ def test_router_falls_back_when_direct_response_is_empty(monkeypatch):
 
     result = router_node.router_node({"messages": [HumanMessage(content="Ajuda")]})
 
-    assert result == {"route": "orchestrator", "turn_agents": ["router_invalid_response"]}
+    assert result == {
+        "route": "orchestrator",
+        "turn_agents": ["router_invalid_response"],
+    }

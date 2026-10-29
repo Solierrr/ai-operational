@@ -53,7 +53,7 @@ O token do usuário é repassado ao turno como no `/chat`, então as consultas a
   "workflow_steps": ["router", "action_proposer"],
   "debug": {
     "environment": "QA",
-    "persisted": false,
+    "persisted": true,
     "dry_run": true,
     "duration_ms": 1840.2,
     "route": "action_proposer",
@@ -111,23 +111,65 @@ Sem isso, o playground cadastraria ofertas reais no QA e em PROD. A simulação 
 qualquer chamada com `persist=False` (variável de contexto `debug_dry_run`); o
 `/chat` e o A2A sempre rodam com ela desligada.
 
+## Execução personalizada de um nó
+
+Reexecuta só um nó de um turno já feito, com os prompts `system` trocados, e para nele.
+
+```json
+{
+  "conversation_id": "t1", "message": "oi",
+  "custom": {
+    "turn": 0, "node": "router", "occurrence": 0, "stop_after_node": true,
+    "prompts": [{ "call": 0, "prompt": [{ "type": "system", "content": "texto novo" }, { "type": "human", "content": "oi" }] }]
+  }
+}
+```
+
+- `turn` é a posição do turno na conversa de debug (0 é o primeiro) e `occurrence` é a
+  qual execução do nó no turno (um nó pode repetir, como o router depois de um
+  especialista). `prompts[].call` é o índice da chamada de LLM dentro do nó.
+- O estado de entrada vem do checkpoint da thread `debug:<sub>:<conversation_id>`: ele
+  é copiado para uma thread descartável (apagada ao fim), o grafo roda só esse nó e
+  para nele. A conversa de debug original não muda.
+- Só mensagens `system` são trocadas, na mesma posição em que estavam no prompt; o
+  histórico e a pergunta do usuário nunca mudam.
+- A resposta traz só esse nó em `debug.nodes` e `debug.custom` com `node`, `turn`,
+  `occurrence`, `stopped: true`, `overrides_applied` e `next` (os nós que viriam em
+  seguida). `response` vem vazio.
+- Erros: `404` (turno, nó ou ocorrência inexistente), `409` (não foi possível
+  reconstruir a entrada do nó) e `422` (corpo inválido ou nó bloqueado).
+- `debug.turn` (resposta normal e `500`) é o índice do turno que acabou de rodar: é o
+  valor a enviar em `custom.turn` para reexecutar um nó dele. Vem `null` se o histórico
+  não pôde ser lido.
+- Nós que não podem ser reexecutados respondem `422` com o motivo. A lista (`REPLAY_BLOCKED_NODES` em `src/workflow/debug_replay.py`) está vazia:
+  `debug_dry_run` já impede qualquer efeito fora do serviço nos turnos e nas reexecuções.
+- A mesma chamada de LLM que o wrapper de modelo repete (execução externa e interna com
+  as mesmas mensagens) conta uma vez só, tanto no `debug` quanto no `call` dos `prompts`.
+- Se o prompt veio com `prompt_complete: false`, não o reenvie: o texto
+  mascarado substituiria o original.
+- Os checkpoints expiram em `CHECKPOINT_TTL_DIAS` (30 por padrão); depois disso o turno
+  responde `404`. A leitura do histórico para no máximo 2.000 checkpoints.
+- Cada reexecução deixa uma linha de log com o `sub`, o nó, o turno e a quantidade de
+  prompts, sem o conteúdo dos prompts.
+
+- As ações que gravariam no api-core continuam simuladas (`dry_run`).
+
 ## Limites e privacidade
 
 - CPF, CNPJ, telefone e e-mail são trocados por `[CPF]`, `[CNPJ]`, `[TELEFONE]` e
   `[EMAIL]` em todo o bloco `debug`.
 - `pii_map`, `user_id` e `user_memory` do estado nunca são copiados.
-- Cada texto é cortado em 4.000 caracteres e o bloco `debug` tem teto de 256 KB
-  (os limites por campo diminuem até caber). Quando algo é cortado, `truncated` é `true`.
-  Se mesmo assim passar do teto, as entradas e os prompts são omitidos.
-- Nada do debug é persistido: ele existe só na resposta do turno.
+- Os prompts das chamadas de LLM saem inteiros, sem limite de tamanho, para poderem
+  ser editados na execução personalizada. Cada chamada de LLM traz `prompt_complete`,
+  que é `false` quando alguma mensagem `system` teve dado pessoal mascarado; nesse caso
+  o prompt não deve ser editado.
+- Os demais textos (entrada e saída dos nós, resposta do LLM) são cortados em 4.000
+  caracteres; quando algo é cortado, `truncated` é `true`.
+- O trace dos nós existe só na resposta do turno e não é guardado. O que o turno normal grava no `api-messenger` (conversa, mensagens e steps) está em "O que o modo debug grava e não grava".
 
-## O que o modo debug não grava
+## O que o modo debug grava e não grava
 
-O turno roda com `persist=False`: não cria conversa nem grava mensagens no
-`api-messenger`, não registra os steps de observabilidade, não lê nem atualiza a
-memória de longo prazo e não grava no `api-core`. Uma ressalva: o estado do grafo
-continua indo para o checkpointer, na thread `debug:<sub>:<conversation_id>`,
-separada das conversas reais.
+O turno normal roda com `persist=False, save_history=True`: cria a conversa e grava a mensagem do usuário, a resposta e os steps de observabilidade no `api-messenger` (a conversa nasce com `userDetails.source = "debug"`, `assistant` e `threadId`, para aparecer em Conversas e Dashboards e ser filtrada do uso real), mas não lê nem atualiza a memória de longo prazo e não grava no `api-core`. A execução personalizada de um nó não grava nada. Uma ressalva: o estado do grafo continua indo para o checkpointer, na thread `debug:<sub>:<conversation_id>`, separada das conversas reais.
 
 ## CORS
 

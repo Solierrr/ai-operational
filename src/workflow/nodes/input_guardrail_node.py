@@ -6,6 +6,7 @@ from pydantic import BaseModel, ValidationError
 
 from src.actions.decision import quick_decision
 from src.agents.base.base_prompt import build_system_prompt
+from src.core.config.settings import settings
 from src.core.guardrails.anonymize import anonymize_text
 from src.core.guardrails.injection_patterns import (
     matches_injection_pattern,
@@ -13,6 +14,7 @@ from src.core.guardrails.injection_patterns import (
 )
 from src.core.guardrails.prompt import _PROMPT_CLASSIFICADOR
 from src.core.llm.llm_groq import llm_groq
+from src.core.security.untrusted import wrap_untrusted
 from src.workflow.state import GraphState
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,9 @@ INPUT_GUARDRAIL_PROMPT = build_system_prompt(
 
 BLOCKED_RESPONSE = (
     "Desculpe, não posso processar essa solicitação por políticas de segurança."
+)
+TOO_LONG_RESPONSE = (
+    "Sua mensagem é muito longa. Pode resumir o que precisa em poucas frases?"
 )
 
 
@@ -75,12 +80,15 @@ def _parse_classificacao(texto: str) -> ClassificacaoEntrada:
 
 
 def _blocked_result(
-    state: GraphState, category: str, pii_map: dict | None = None
+    state: GraphState,
+    category: str,
+    pii_map: dict | None = None,
+    response: str = BLOCKED_RESPONSE,
 ) -> dict:
     return {
         "messages": [
             RemoveMessage(id=state["messages"][-1].id),
-            AIMessage(content=BLOCKED_RESPONSE),
+            AIMessage(content=response),
         ],
         "route": "end",
         "pii_map": pii_map or {},
@@ -91,6 +99,8 @@ def _blocked_result(
 def input_guardrail_node(state: GraphState, config=None) -> dict:
     last_message = state["messages"][-1].content
 
+    if len(last_message) > settings.MAX_MESSAGE_CHARS:
+        return _blocked_result(state, "mensagem_longa", response=TOO_LONG_RESPONSE)
     if matches_injection_pattern(last_message):
         return _blocked_result(state, "manipulacao_regex")
     if matches_internal_data_keyword(last_message):
@@ -106,7 +116,9 @@ def input_guardrail_node(state: GraphState, config=None) -> dict:
         }
 
     anonymized_text, pii_map = anonymize_text(last_message)
-    formatted_prompt = INPUT_GUARDRAIL_PROMPT.format(mensagem=anonymized_text)
+    formatted_prompt = INPUT_GUARDRAIL_PROMPT.format(
+        mensagem=wrap_untrusted("mensagem_do_usuario", anonymized_text)
+    )
 
     try:
         resposta = llm_groq().invoke(

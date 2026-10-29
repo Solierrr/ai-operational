@@ -49,7 +49,7 @@ def test_execute_turn_sem_persistir_so_passa_pelo_grafo(monkeypatch):
     assert resultado["messages"][0].content == "oi"
     config_usado = workflow.ainvoke.await_args.kwargs["config"]
     assert config_usado["callbacks"] == [coletor]
-    assert config_usado["configurable"] == {"thread_id": "debug:thread"}
+    assert config_usado["configurable"] == {"thread_id": "operational:debug:thread"}
     assert workflow.ainvoke.await_args.args[0]["user_memory"] == ""
 
 
