@@ -10,6 +10,7 @@ from src.core.llm.keys import key_client
 from src.infra.database.mongo.indexes.user_memory_indexes import (
     ensure_user_memory_indexes,
 )
+from src.otel_setup import configure_otel
 
 
 def cors_origins(raw: str) -> list[str]:
@@ -56,3 +57,5 @@ def health() -> dict:
         "status": "ok" if not missing else "atencao",
         "missing_settings": missing,
     }
+
+configure_otel(app, "ai-operational")
