@@ -33,3 +33,9 @@ def decide_post_judge(state: GraphState) -> str:
     if state.get("judge_status") == "retry":
         return "retry"
     return "output_guardrail"
+
+
+def decide_post_proposal(state: GraphState) -> str:
+    if state.get("route") == "reroute":
+        return "router"
+    return "end"

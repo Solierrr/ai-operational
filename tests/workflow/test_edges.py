@@ -3,6 +3,7 @@ import pytest
 from src.workflow.edges.routing_edges import (
     decide_post_input_guardrail,
     decide_post_judge,
+    decide_post_proposal,
     decide_post_router,
 )
 
@@ -53,3 +54,14 @@ def test_decide_post_judge_returns_output_guardrail_when_approved():
 
 def test_decide_post_judge_returns_output_guardrail_when_blocked():
     assert decide_post_judge({"judge_status": "blocked"}) == "output_guardrail"
+
+
+def test_decide_post_proposal_volta_ao_roteador_so_no_reroute():
+    assert decide_post_proposal({"route": "reroute"}) == "router"
+    assert decide_post_proposal({"route": "end"}) == "end"
+    assert decide_post_proposal({}) == "end"
+
+
+@pytest.mark.parametrize("route", ["how_to_guide", "data_reader"])
+def test_decide_post_router_aceita_os_novos_especialistas(route):
+    assert decide_post_router({"route": route}) == route
