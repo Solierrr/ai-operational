@@ -22,9 +22,9 @@ paths:
       tags:
       - Conversa
       summary: Envia uma mensagem ao agente operacional
-      description: 'Roda um turno da conversa com o JWT do usuário. Recusa do guardrail, fallback e falha de ferramenta não
-        são erro HTTP: voltam 200 com outcome e reason. Ações que gravam dados são só propostas e dependem do aceite do usuário
-        no turno seguinte.'
+      description: 'Roda um turno da conversa com o JWT do usuário, validado no api-auth antes do turno. Recusa do guardrail,
+        fallback e falha de ferramenta não são erro HTTP: voltam 200 com outcome e reason. Ações que gravam dados são só propostas
+        e dependem do aceite do usuário no turno seguinte.'
       operationId: sendChatMessage
       requestBody:
         content:
@@ -40,13 +40,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChatResponse'
         '401':
-          description: Token ausente ou inválido
+          description: Token ausente, inválido ou expirado
           content: &id001
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: A conversa pertence a outro usuário
+          content: *id001
         '422':
           description: Corpo da requisição inválido
+          content: *id001
+        '503':
+          description: Validação do JWT não configurada
           content: *id001
         '500':
           description: Erro interno inesperado
@@ -55,7 +61,9 @@ paths:
       - bearerAuth: []
       x-error-codes:
       - UNAUTHENTICATED
+      - FORBIDDEN
       - VALIDATION_FAILED
+      - DEPENDENCY_UNAVAILABLE
       - INTERNAL_ERROR
   /health:
     get:

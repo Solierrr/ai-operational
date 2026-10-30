@@ -8,6 +8,8 @@ from src.a2a.server import mount as mount_a2a
 from src.api.errors import apply_problem_details, register_error_handlers
 from src.api.routes import chat, debug, health
 from src.core.config.settings import settings
+from src.core.llm.keys import key_client
+from src.core.observability.langsmith_tracing import warn_if_global_tracing
 from src.infra.database.mongo.indexes.user_memory_indexes import (
     ensure_user_memory_indexes,
 )
@@ -33,6 +35,7 @@ def cors_origins(raw: str) -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    warn_if_global_tracing()
     await ensure_user_memory_indexes()
     yield
 

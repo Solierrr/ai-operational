@@ -8,6 +8,7 @@ from src.agents.base.base_prompt import build_system_prompt
 from src.core.guardrails.anonymize import deanonymize_text
 from src.core.guardrails.prompt import _PROMPT_COMPLIANCE
 from src.core.llm.llm_groq import llm_groq
+from src.core.security.untrusted import scrub_output
 from src.workflow.outcome import Outcome, Reason, outcome_kwargs
 from src.workflow.state import GraphState
 from src.workflow.turn_tracking import append_turn_agent, specialists_used
@@ -75,7 +76,9 @@ def output_guardrail_node(state: GraphState, config=None) -> dict:
             [HumanMessage(content=formatted_prompt)], config=config
         )
         revisao = _parse_revisao_compliance(resposta.content)
-        final_text = deanonymize_text(revisao.resposta_revisada, state["pii_map"])
+        final_text = scrub_output(
+            deanonymize_text(revisao.resposta_revisada, state["pii_map"])
+        )
     except (GroqError, ValidationError, ValueError, TypeError, AttributeError) as erro:
         # fail-closed: se o guardrail nao conseguiu revisar, nao deixa a
         # resposta nao revisada sair - troca por uma mensagem generica

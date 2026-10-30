@@ -4,7 +4,16 @@ Este serviço segue o mesmo padrão do `ai-assistant`: uma API FastAPI que
 expõe um chatbot orquestrado via LangGraph, com guardrails de entrada/saída,
 memória de curto prazo (checkpointer Mongo) e memória de longo prazo (perfil
 de fatos do usuário), delegando a especialistas de domínio por meio de um
-Agente Roteador. Os especialistas são o Localizador de Telas (`screen_finder`, ferramenta `buscar_tela` sobre o registro de telas em `src/domain/screens.py`), o Agente de Ações (`action_proposer`, que monta a proposta sem gravar) e o nó de decisão (`proposal_decision`, que executa no `api-core` depois do aceite). A proposta pendente fica em `pending_proposal` no estado e as respostas desses dois nós seguem direto ao usuário, sem passar pelo orquestrador, pelo juiz e pelo guardrail de saída.
+Agente Roteador. Os especialistas são:
+
+- Localizador de Telas (`screen_finder`, ferramenta `buscar_tela` sobre o registro de telas em `src/domain/screens.py`);
+- Guia (`how_to_guide`, ferramentas `buscar_guia` e `buscar_tela`): passo a passo das tarefas, a partir do registro `src/domain/guides.py`;
+- Consulta (`data_reader`, ferramentas de leitura em `src/tools/account.py`): dados do próprio usuário no `api-core`, sempre com o JWT dele;
+- Agente de Ações (`action_proposer`): escolhe a ação numa lista fixa (`src/actions/registry.py`), extrai os dados, resolve os ids nos dados do próprio usuário e monta a proposta, sem gravar.
+
+O nó de decisão (`proposal_decision`) executa no `api-core` depois do aceite. A proposta pendente fica em `pending_proposal` no estado (assinada, com validade e presa ao usuário) e as respostas dos nós de ação seguem direto ao usuário, sem passar pelo orquestrador, pelo juiz e pelo guardrail de saída. As respostas do Guia e da Consulta passam pelo orquestrador, pelo juiz e pelo guardrail de saída. Quando o usuário ajusta a proposta ou muda de assunto, ela é descartada e o turno volta ao roteador.
+
+Para acrescentar uma ação nova: crie um módulo em `src/actions/` com `prepare`, `execute` e um `ActionSpec`, e registre-o em `src/actions/registry.py`. Para acrescentar um guia ou uma tela: `src/domain/guides.py` e `src/domain/screens.py`.
 
 <p>
   <a href="https://github.com/syvixor/skills-icons">

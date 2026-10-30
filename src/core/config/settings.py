@@ -25,6 +25,16 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "LOCAL"
 
     DOCS_ENABLED: bool = True
+    PROPOSAL_SIGNING_KEY: str | None = None
+    PROPOSAL_TTL_SECONDS: int = 900
+    MAX_WRITES_PER_CONVERSATION: int = 10
+    MAX_MESSAGE_CHARS: int = 2000
+
+    SOLARIA_LANGSMITH_ENABLED: bool = False
+    SOLARIA_LANGSMITH_API_KEY: str | None = None
+    SOLARIA_LANGSMITH_PROJECT: str = "solaria-local"
+    SOLARIA_LANGSMITH_ENDPOINT: str | None = None
+    SOLARIA_LANGSMITH_SAMPLING_RATE: float = 1.0
 
     CORS_ALLOWED_ORIGINS: str = (
         "http://localhost:5173,http://localhost:3000,http://localhost:5174,"

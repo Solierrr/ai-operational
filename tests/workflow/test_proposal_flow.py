@@ -57,7 +57,13 @@ def app(monkeypatch):
     monkeypatch.setattr(
         router, "llm_groq", lambda: _llm("ROTA: action_proposer\nRESPOSTA_DIRETA:")
     )
-    monkeypatch.setattr(proposer, "ask_json", AsyncMock(return_value=DADOS))
+
+    async def ask_json(prompt, config=None):
+        if "Ações disponíveis" in prompt:
+            return {"acao": "create_offer"}
+        return DADOS
+
+    monkeypatch.setattr(proposer, "ask_json", ask_json)
     monkeypatch.setattr(proposer, "ApiCoreClient", factory)
     monkeypatch.setattr(decision, "ApiCoreClient", factory)
 
@@ -145,3 +151,39 @@ def test_aceite_em_modo_debug_simula_e_nao_grava_no_api_core(app):
     client.create_offer.assert_not_awaited()
     assert "[Modo debug] Simulação" in segundo["messages"][-1].content
     assert segundo["pending_proposal"] is None
+
+
+def test_ajuste_descarta_a_proposta_e_gera_outra_com_o_valor_novo(app, monkeypatch):
+    compiled, client = app
+    decision = importlib.import_module("src.workflow.nodes.proposal_decision_node")
+    proposer = importlib.import_module("src.workflow.nodes.action_proposer_node")
+    primeiro = _turno(compiled, "cadastra a Canadian CS6R a 900,50 com 40 unidades")
+    id_antigo = primeiro["pending_proposal"]["id"]
+
+    async def ask_json(prompt, config=None):
+        if "Ações disponíveis" in prompt:
+            return {"acao": "create_offer"}
+        return {**DADOS, "preco_unitario": 800}
+
+    monkeypatch.setattr(
+        decision, "ask_json", AsyncMock(return_value={"decisao": "ajustar"})
+    )
+    monkeypatch.setattr(proposer, "ask_json", ask_json)
+
+    segundo = _turno(compiled, "muda o preço para 800")
+
+    client.create_offer.assert_not_awaited()
+    assert "R$ 800,00" in segundo["messages"][-1].content
+    assert segundo["pending_proposal"]["id"] != id_antigo
+    assert segundo["pending_proposal"]["payload"]["unitPrice"] == 800.0
+
+
+def test_aceite_so_executa_a_proposta_vigente_com_o_payload_assinado(app):
+    compiled, client = app
+    primeiro = _turno(compiled, "cadastra a Canadian CS6R a 900,50 com 40 unidades")
+
+    _turno(compiled, "sim")
+
+    client.create_offer.assert_awaited_once_with(
+        primeiro["pending_proposal"]["payload"]
+    )

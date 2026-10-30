@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
+from src.actions.proposal import make_proposal
 from src.core.security.request_context import current_user_token
 from src.infra.api_core.client import ApiCoreError, SupplierRef
 from src.workflow.nodes import action_proposer_node as proposer
@@ -46,8 +47,10 @@ def _core(monkeypatch, suppliers=(ACME,), models=(MODELO,), create=None):
     return client
 
 
-def _json(monkeypatch, dados):
-    monkeypatch.setattr(proposer, "ask_json", AsyncMock(return_value=dados))
+def _json(monkeypatch, dados, acao="create_offer"):
+    monkeypatch.setattr(
+        proposer, "ask_json", AsyncMock(side_effect=[{"acao": acao}, dados])
+    )
 
 
 def _propor(state=STATE):
@@ -170,17 +173,18 @@ def test_sem_token_nao_propoe(monkeypatch):
 
 # ---- decisão sobre a proposta pendente
 
-PENDENTE = {
-    "action": "create_offer",
-    "payload": {
+PENDENTE = make_proposal(
+    "create_offer",
+    {
         "supplierId": "s1",
         "modelId": "m1",
         "title": "Placa X",
         "unitPrice": 900.5,
         "availability": 40,
     },
-    "resumo": "Posso cadastrar esta oferta...",
-}
+    "Posso cadastrar esta oferta...",
+    None,
+)
 
 
 def _decidir(texto, pendente=PENDENTE):
@@ -215,16 +219,18 @@ def test_recusa_descarta_sem_gravar(monkeypatch, texto):
     assert result["pending_proposal"] is None
 
 
-def test_frase_longa_passa_pelo_llm_e_aceite_do_llm_executa(monkeypatch):
+def test_aceite_dito_pelo_llm_nunca_executa(monkeypatch):
     client = _core(monkeypatch)
     monkeypatch.setattr(
         decision, "ask_json", AsyncMock(return_value={"decisao": "aceitar"})
     )
+    monkeypatch.setattr(decision, "ask_text", AsyncMock(return_value=""))
 
     result = _decidir("olha, tá tudo certo, pode seguir com isso")
 
-    client.create_offer.assert_awaited_once()
-    assert result["pending_proposal"] is None
+    client.create_offer.assert_not_awaited()
+    assert result["pending_proposal"]["em_duvida"] is True
+    assert "continua pendente" in result["messages"][0].content
 
 
 @pytest.mark.parametrize("retorno", [{"decisao": "talvez"}, {}, {"decisao": None}])
@@ -238,7 +244,7 @@ def test_decisao_invalida_do_llm_nunca_executa(monkeypatch, retorno):
     result = _decidir("e o frete, como fica?")
 
     client.create_offer.assert_not_awaited()
-    assert "pending_proposal" not in result
+    assert result["pending_proposal"]["em_duvida"] is True
     assert "continua pendente" in result["messages"][0].content
 
 
@@ -267,18 +273,18 @@ def test_duvida_responde_e_mantem_a_proposta(monkeypatch):
     result = _decidir("quantas unidades mesmo?")
 
     assert "São 40 unidades." in result["messages"][0].content
-    assert "pending_proposal" not in result
+    assert result["pending_proposal"]["em_duvida"] is True
 
 
 def test_erro_do_api_core_ao_executar_descarta_e_explica(monkeypatch):
     client = _core(monkeypatch)
     client.create_offer.side_effect = ApiCoreError(
-        "Você não tem permissão para fazer isso nesta empresa."
+        "Você não tem permissão para fazer isso nesta empresa.", 403
     )
 
     result = _decidir("sim")
 
-    assert "Não consegui cadastrar" in result["messages"][0].content
+    assert "Não consegui executar" in result["messages"][0].content
     assert "permissão" in result["messages"][0].content
     assert result["pending_proposal"] is None
     assert result["messages"][0].additional_kwargs["outcome"] == "TOOL_FAILED"
