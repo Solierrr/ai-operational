@@ -14,6 +14,7 @@ from fastapi import FastAPI, HTTPException
 from src.api.auth import require_valid_token
 from src.core.config.settings import settings
 from src.core.security.conversation_access import ConversationAccessDenied
+from src.version import VERSION
 
 _SEM_TOKEN = "É preciso estar autenticado para executar ações na plataforma."
 _TOKEN_INVALIDO = "Sua sessão expirou ou é inválida. Entre de novo para continuar."
@@ -46,7 +47,7 @@ def build_card():
     return build_agent_card(
         name="Agente Operacional Solaria",
         description="Executa ações no SaaS em nome do usuário, com aprovação antes de gravar.",
-        version="0.1.0",
+        version=VERSION,
         base_url=settings.A2A_PUBLIC_URL,
         skills=SKILLS,
     )

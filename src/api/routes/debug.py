@@ -15,12 +15,14 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, field_validator
 
+from src.api.routes.chat import chat_response
 from src.api.schemas.chat import ChatRequest, ChatResponse
 from src.core.config.settings import settings
 from src.core.security.conversation_access import thread_key
 from src.core.security.jwt import decode_user_id
 from src.workflow.debug_replay import ReplayError, count_turns
 from src.workflow.observability.debug_tracker import DebugTracker, mask_pii
+from src.workflow.outcome import Outcome
 from src.workflow.runner import execute_single_node, execute_turn
 
 logger = logging.getLogger(__name__)
@@ -152,21 +154,12 @@ async def conversar_com_debug(
             },
         )
 
-    final_message = final_state["messages"][-1]
-    metadata = final_message.additional_kwargs
     debug = collector.snapshot()
     debug["environment"] = settings.ENVIRONMENT
     debug["persisted"] = True
     debug["dry_run"] = True
     debug["turn"] = await _last_turn(compiled_app, thread_id)
-    return DebugChatResponse(
-        response=final_message.content,
-        specialists_used=metadata.get("specialists_used", []),
-        workflow_steps=metadata.get(
-            "workflow_steps", final_state.get("turn_agents", [])
-        ),
-        debug=debug,
-    )
+    return DebugChatResponse(**chat_response(final_state, debug=debug))
 
 
 def _no_para_log(workflow, node: str) -> str:
@@ -227,4 +220,4 @@ async def _executar_no(requisicao, workflow, token, thread_id, collector, sub):
         "overrides_applied": aplicados,
         "next": list(proximos),
     }
-    return DebugChatResponse(response="", debug=debug)
+    return DebugChatResponse(response="", outcome=Outcome.ANSWERED, debug=debug)
