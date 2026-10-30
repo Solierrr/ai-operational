@@ -1,23 +1,31 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
-  title: '[NOME_DO_PROJETO]'
-  description: Contrato HTTP deste serviço. Use um access token emitido pelo api-auth nas operações com bearerAuth.
-    URLs e credenciais são configuradas no cliente HTTP; este arquivo não contém valores privados.
-  version: 0.1.0
+  title: Solaria — ai-operational
+  description: 'Agente que ajuda o usuário a operar o SaaS da Solaria: indica a tela certa do web-app e propõe ações (hoje,
+    cadastrar uma oferta de placa) que só são executadas no api-core depois do aceite do usuário. Autentique com o JWT do
+    api-auth (bearerAuth). O A2A, usado pelo ai-assistant, não faz parte deste contrato: o Agent Card fica em /.well-known/agent-card.json.'
+  contact:
+    name: Solaria
+    url: https://github.com/Solierrr
+  license:
+    name: CC0-1.0
+    url: https://creativecommons.org/publicdomain/zero/1.0/
+  version: 0.1.1 # x-release-please-version
 servers:
-- url: http://localhost:{port}
-  description: Execução local; ajuste a porta ou substitua o servidor no cliente HTTP.
-  variables:
-    port:
-      default: '8000'
+- url: https://ai-operational.onrender.com
+  description: QA
+- url: http://localhost:8000
+  description: Local
 paths:
   /chat:
     post:
       tags:
-      - Chat
-      summary: Enviar mensagem ao chatbot
-      description: Valida e persiste a mensagem antes de enfileirar seu processamento.
-      operationId: conversar_chat_post
+      - Conversa
+      summary: Envia uma mensagem ao agente operacional
+      description: 'Roda um turno da conversa com o JWT do usuário, validado no api-auth antes do turno. Recusa do guardrail,
+        fallback e falha de ferramenta não são erro HTTP: voltam 200 com outcome e reason. Ações que gravam dados são só propostas
+        e dependem do aceite do usuário no turno seguinte.'
+      operationId: sendChatMessage
       requestBody:
         content:
           application/json:
@@ -25,236 +33,296 @@ paths:
               $ref: '#/components/schemas/ChatRequest'
         required: true
       responses:
-        '202':
+        '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ChatAcceptedResponse'
-        '400':
-          description: Validation Error (VALIDATION_ERROR)
-          content:
+                $ref: '#/components/schemas/ChatResponse'
+        '401':
+          description: Token ausente, inválido ou expirado
+          content: &id001
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ValidationProblemDetail'
+                $ref: '#/components/schemas/ProblemDetail'
+        '403':
+          description: A conversa pertence a outro usuário
+          content: *id001
+        '422':
+          description: Corpo da requisição inválido
+          content: *id001
+        '503':
+          description: Validação do JWT não configurada
+          content: *id001
+        '500':
+          description: Erro interno inesperado
+          content: *id001
       security:
       - bearerAuth: []
-  /chat/{event_id}:
-    get:
-      tags:
-      - chat
-      summary: Consultar processamento do chatbot
-      description: Retorna o estado atual e as métricas temporárias de um evento.
-      operationId: consultar_resultado_chat__event_id__get
-      parameters:
-      - name: event_id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-          title: Event Id
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChatResultResponse'
-        '404':
-          description: Evento não encontrado ou resultado expirado.
-        '400':
-          description: Validation Error (VALIDATION_ERROR)
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ValidationProblemDetail'
-      security: []
+      x-error-codes:
+      - UNAUTHENTICATED
+      - FORBIDDEN
+      - VALIDATION_FAILED
+      - DEPENDENCY_UNAVAILABLE
+      - INTERNAL_ERROR
   /health:
     get:
-      summary: Health
-      description: Informa se as configurações obrigatórias foram fornecidas.
-      operationId: health_health_get
+      tags:
+      - Saúde
+      summary: Indica se o processo está vivo
+      description: Só o processo, sem consultar dependências; traz a versão do release.
+      operationId: getHealth
       responses:
         '200':
           description: Successful Response
           content:
             application/json:
               schema:
-                additionalProperties: true
-                type: object
-                title: Response Health Health Get
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Erro interno inesperado
+          content: *id001
       security: []
+      x-error-codes:
+      - INTERNAL_ERROR
+  /ready:
+    get:
+      tags:
+      - Saúde
+      summary: Indica se o serviço está pronto para atender
+      description: Consulta só o MongoDB (checkpointer e memória do agente), com timeout de 2 segundos. Provedores de LLM
+        ficam de fora porque há fallback entre eles. Responde 503 com {"status":"DOWN"} quando o banco não responde.
+      operationId: getReady
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '503':
+          description: Serviço não pronto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '500':
+          description: Erro interno inesperado
+          content: *id001
+      security: []
+      x-error-codes:
+      - INTERNAL_ERROR
 components:
   schemas:
-    ChatAcceptedResponse:
-      properties:
-        event_id:
-          type: string
-          format: uuid
-          title: Event Id
-        status:
-          type: string
-          title: Status
-          default: queued
-          enum:
-          - queued
-      type: object
-      required:
-      - event_id
-      title: ChatAcceptedResponse
-      description: Confirma o recebimento da mensagem pela fila.
     ChatRequest:
       properties:
         conversation_id:
           type: string
-          minLength: 1
           title: Conversation Id
-          example: conversa-exemplo-42
+          description: Identificador da conversa, escolhido pelo cliente e reaproveitado a cada turno.
+          examples:
+          - b2b-empresa-42
         message:
           type: string
-          maxLength: 8000
           minLength: 1
           title: Message
-          example: Mensagem de exemplo do usuário
+          description: Mensagem do usuário.
+          examples:
+          - Onde cadastro uma oferta de placa?
       type: object
       required:
       - conversation_id
       - message
       title: ChatRequest
-      description: Mensagem enviada ao chatbot.
-    ChatResultResponse:
+      description: O que o cliente envia no POST /chat.
+    ChatResponse:
       properties:
-        event_id:
-          type: string
-          format: uuid
-          title: Event Id
-        status:
-          type: string
-          enum:
-          - queued
-          - processing
-          - completed
-          - failed
-          title: Status
-        conversation_id:
-          type: string
-          nullable: true
-          title: Conversation Id
         response:
           type: string
-          nullable: true
           title: Response
-        error:
-          type: string
-          nullable: true
-          title: Error
-        error_type:
-          type: string
-          nullable: true
-          title: Error Type
-        queued_at:
-          type: string
-          format: date-time
-          nullable: true
-          title: Queued At
-        started_at:
-          type: string
-          format: date-time
-          nullable: true
-          title: Started At
-        completed_at:
-          type: string
-          format: date-time
-          nullable: true
-          title: Completed At
-        queue_wait_ms:
-          type: integer
-          minimum: 0.0
-          nullable: true
-          title: Queue Wait Ms
-        processing_time_ms:
-          type: integer
-          minimum: 0.0
-          nullable: true
-          title: Processing Time Ms
-        total_time_ms:
-          type: integer
-          minimum: 0.0
-          nullable: true
-          title: Total Time Ms
+          description: Resposta do assistente para mostrar ao usuário.
+          examples:
+          - A tela de ofertas fica em Fornecedor > Ofertas.
+        outcome:
+          $ref: '#/components/schemas/Outcome'
+          description: 'Resultado do turno: ANSWERED (respondido), REFUSED (o guardrail recusou), DEGRADED (houve fallback
+            e a resposta é genérica) ou TOOL_FAILED (uma ferramenta falhou e a resposta saiu sem ela).'
+          default: ANSWERED
+        reason:
+          anyOf:
+          - $ref: '#/components/schemas/Reason'
+          - type: 'null'
+          description: Código do motivo, no catálogo de erros, quando outcome não é ANSWERED.
+          examples:
+          - OUT_OF_SCOPE
         specialists_used:
           items:
             type: string
           type: array
           title: Specialists Used
+          description: Especialistas consultados no turno.
+          examples:
+          - - screen_finder
         workflow_steps:
           items:
             type: string
           type: array
           title: Workflow Steps
+          description: Etapas do grafo percorridas no turno.
+          examples:
+          - - input_guardrail_approved
+            - router
+            - screen_finder
       type: object
       required:
-      - event_id
-      - status
-      title: ChatResultResponse
-      description: Estado temporário do processamento assíncrono.
-    ProblemDetail:
-      type: object
-      description: 'Corpo de todo erro (application/problem+json). O cliente decide pelo errorCode; detail é texto para humanos. Sem type.'
-      required:
-      - title
-      - status
-      - detail
-      - errorCode
-      - timestamp
+      - response
+      title: ChatResponse
+      description: O que a API devolve no POST /chat.
+    HealthResponse:
       properties:
-        title:
-          type: string
-          description: Reason phrase do status, por exemplo Bad Request.
         status:
-          type: integer
+          type: string
+          const: UP
+          title: Status
+          examples:
+          - UP
+        version:
+          type: string
+          title: Version
+          examples:
+          - 0.1.1
+      type: object
+      required:
+      - status
+      - version
+      title: HealthResponse
+    Outcome:
+      type: string
+      enum:
+      - ANSWERED
+      - REFUSED
+      - DEGRADED
+      - TOOL_FAILED
+      title: Outcome
+    ReadyResponse:
+      properties:
+        status:
+          type: string
+          enum:
+          - UP
+          - DOWN
+          title: Status
+          examples:
+          - UP
+      type: object
+      required:
+      - status
+      title: ReadyResponse
+    Reason:
+      type: string
+      enum:
+      - OUT_OF_SCOPE
+      - MANIPULATION_ATTEMPT
+      - INTERNAL_DATA_REQUEST
+      - FALSE_INFORMATION
+      - GUARDRAIL_REFUSED
+      - GUARDRAIL_UNAVAILABLE
+      - ANSWER_REJECTED
+      - ACTION_FAILED
+      title: Reason
+    ProblemFieldError:
+      properties:
+        field:
+          examples:
+          - message
+          title: Field
+          type: string
+        errorCode:
+          examples:
+          - VALIDATION_FAILED
+          title: Errorcode
+          type: string
         detail:
+          examples:
+          - String should have at least 1 character
+          title: Detail
+          type: string
+      required:
+      - field
+      - errorCode
+      - detail
+      title: ProblemFieldError
+      type: object
+    ProblemDetail:
+      description: Corpo de todo erro HTTP do serviço.
+      properties:
+        type:
+          examples:
+          - about:blank
+          title: Type
+          type: string
+        title:
+          examples:
+          - UNAUTHENTICATED
+          title: Title
+          type: string
+        status:
+          examples:
+          - 401
+          title: Status
+          type: integer
+        errorCode:
+          examples:
+          - UNAUTHENTICATED
+          title: Errorcode
+          type: string
+        detail:
+          examples:
+          - Token ausente ou inválido.
+          title: Detail
           type: string
         instance:
+          examples:
+          - /chat
+          title: Instance
           type: string
-          description: Caminho da requisição.
-        errorCode:
-          type: string
-          example: RESOURCE_NOT_FOUND
         timestamp:
-          type: string
           format: date-time
-        traceId:
+          title: Timestamp
           type: string
-          description: Só aparece quando há span ativo.
-      title: ProblemDetail
-    ValidationProblemDetail:
-      allOf:
-      - $ref: '#/components/schemas/ProblemDetail'
-      - type: object
-        required:
-        - errors
-        properties:
-          errors:
+        traceId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: null
+          title: Traceid
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProblemFieldError'
             type: array
-            items:
-              type: object
-              required:
-              - field
-              - message
-              properties:
-                field:
-                  type: string
-                  nullable: true
-                  description: Caminho do campo no Pydantic, por exemplo items.0.qty.
-                message:
-                  type: string
-                  description: Mensagem do Pydantic, em inglês.
-      title: ValidationProblemDetail
+          - type: 'null'
+          default: null
+          title: Errors
+      required:
+      - type
+      - title
+      - status
+      - errorCode
+      - detail
+      - instance
+      - timestamp
+      title: ProblemDetail
+      type: object
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Access token de usuário emitido pelo api-auth.
+tags:
+- name: Conversa
+  description: Turnos da conversa com o agente operacional
+- name: Saúde
+  description: Vivo e pronto, para a plataforma e o monitoramento
+security:
+- bearerAuth: []

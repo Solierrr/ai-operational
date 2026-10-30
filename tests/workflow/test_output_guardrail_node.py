@@ -63,6 +63,8 @@ def test_output_guardrail_fails_closed_when_groq_raises(monkeypatch):
     monkeypatch.setattr(output_guardrail_node, "deanonymize_text", deanonymize)
     result = output_guardrail_node.output_guardrail_node(_state())
     assert result["messages"][1].content == output_guardrail_node.FALLBACK_RESPONSE
+    assert result["messages"][1].additional_kwargs["outcome"] == "DEGRADED"
+    assert result["messages"][1].additional_kwargs["reason"] == "GUARDRAIL_UNAVAILABLE"
     deanonymize.assert_not_called()
 
 

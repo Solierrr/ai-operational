@@ -52,3 +52,6 @@ uvicorn src.api.app:app --reload
 ## Autenticação e CORS do `/chat`
 
 O `POST /chat` valida o JWT do `api-auth` (RS256 via `JWT_JWKS_URL`, emissor `JWT_ISSUER`) antes de rodar o turno: token inválido, expirado ou de refresh responde `401`. Fora do ambiente `LOCAL`, sem `JWT_JWKS_URL` a rota responde `503` em vez de ficar aberta. As origens do navegador autorizadas vêm de `CORS_ALLOWED_ORIGINS` (lista separada por vírgula, sem credenciais e sem `*`).
+## Autenticação local
+
+O JWT de usuário vem do `api-auth` de verdade, sem emissor falso: suba a stack local com `make dev-up` no `database-console` e aponte `JWT_JWKS_URL` para o JWKS dele (`http://localhost:8081/.well-known/jwks.json`). Para conversar pelo terminal, rode `python main.py` e informe o access token obtido no login do `api-auth` local.
