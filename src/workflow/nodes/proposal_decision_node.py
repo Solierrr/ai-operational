@@ -15,6 +15,7 @@ from src.core.security.untrusted import wrap_untrusted
 from src.infra.api_core.client import ApiCoreClient, ApiCoreError
 from src.workflow.nodes.llm_json import InvalidJsonReply, ask_json, ask_text
 from src.workflow.nodes.replies import reply
+from src.workflow.outcome import Outcome, Reason
 from src.workflow.state import GraphState
 from src.workflow.turn_tracking import append_turn_agent
 
@@ -100,7 +101,13 @@ async def _executar(state: GraphState, spec, pendente: dict) -> dict:
             if erro.status is None
             else f"Não consegui executar. {erro.message}"
         )
-        return reply(state, AGENT, texto, pending_proposal=None)
+        return reply(
+            state,
+            AGENT,
+            texto,
+            outcome=(Outcome.TOOL_FAILED, Reason.ACTION_FAILED),
+            pending_proposal=None,
+        )
     logger.info("Ação %s executada (proposta %s)", spec.name, pendente.get("id"))
     return reply(
         state,

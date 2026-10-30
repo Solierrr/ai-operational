@@ -5,7 +5,14 @@
   "pull-request-footer": "\n\n---\nDepois de validar os checks, comente `/release` para publicar.",
   "packages": {
     ".": {
-      "release-type": "simple"
+      "release-type": "simple",
+      "package-name": "ai-operational",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "openapi.yaml"
+        }
+      ]
     }
   }
 }

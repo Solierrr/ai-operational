@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     ENVIRONMENT: str = "LOCAL"
 
+    DOCS_ENABLED: bool = True
     PROPOSAL_SIGNING_KEY: str | None = None
     PROPOSAL_TTL_SECONDS: int = 900
     MAX_WRITES_PER_CONVERSATION: int = 10
@@ -47,10 +48,6 @@ class Settings(BaseSettings):
 
     # A2A: URL pública deste serviço, anunciada no Agent Card.
     A2A_PUBLIC_URL: str = "http://localhost:8003"
-
-    TEST_USER_TOKEN: str | None = (
-        None  # só pra uso local via main.py, nunca em produção
-    )
 
     MCP_URL: str = "http://localhost:8001/mcp"
     MCP_API_KEY: str | None = None

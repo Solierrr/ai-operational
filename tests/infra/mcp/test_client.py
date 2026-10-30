@@ -49,3 +49,20 @@ def test_get_mcp_tool_nome_inexistente_devolve_lista_vazia(monkeypatch):
     resultado = asyncio.run(client.get_mcp_tool("tool_que_nao_existe"))
 
     assert resultado == []
+
+
+def test_headers_send_the_service_key_and_the_old_key_while_defined(monkeypatch):
+    monkeypatch.setattr(client.settings, "SERVICE_KEY", "chave-do-ai-operational")
+    monkeypatch.setattr(client.settings, "MCP_API_KEY", "chave-antiga")
+
+    assert client._headers() == {
+        "X-Service-Key": "chave-do-ai-operational",
+        "x-api-key": "chave-antiga",
+    }
+
+
+def test_headers_drop_the_old_key_when_not_defined(monkeypatch):
+    monkeypatch.setattr(client.settings, "SERVICE_KEY", "chave-do-ai-operational")
+    monkeypatch.setattr(client.settings, "MCP_API_KEY", None)
+
+    assert client._headers() == {"X-Service-Key": "chave-do-ai-operational"}
