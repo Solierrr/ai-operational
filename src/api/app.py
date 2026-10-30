@@ -7,6 +7,7 @@ from src.a2a.server import mount as mount_a2a
 from src.api.routes import chat, debug
 from src.core.config.settings import settings
 from src.core.llm.keys import key_client
+from src.core.observability.errors import register_error_handlers
 from src.core.observability.langsmith_tracing import warn_if_global_tracing
 from src.core.observability.observability import setup_observability
 from src.infra.database.mongo.indexes.user_memory_indexes import (
@@ -33,6 +34,8 @@ app = FastAPI(
 )
 # logo após criar a app -> os spans HTTP já existem quando as rotas e os middlewares entram
 setup_observability(app, "ai-operational")
+# erros viram ProblemDetail e marcam o span criado acima -> precisa vir depois da observabilidade
+register_error_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
