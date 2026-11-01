@@ -1,0 +1,9 @@
+{
+  "service": "ai-operational",
+  "aliases": [
+    "operational",
+    "ai-operational"
+  ],
+  "project": "AI",
+  "host": "https://operational.solarianetwork.site"
+}
