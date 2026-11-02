@@ -1,57 +1,72 @@
-# Rodando o Projeto Localmente
-
-Este repositório é Python. O processo local é sempre o mesmo: clonar, criar um ambiente virtual, instalar as dependências do `requirements.txt` (ou `.lock`) e subir a aplicação via `uvicorn`. Antes de iniciar, verifique a seção de impedimentos abaixo — alguns repositórios dependem de credenciais externas mesmo em ambiente local.
-
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python,fastapi,pydantic,github,gcp" height="48" alt="Rodando o Projeto — Python">
-  </a>
+<p align="center">
+  <img src="../assets/readme/banners/fastapi.png" alt="FastAPI" width="100%">
 </p>
 
-## Possíveis Impedimentos
+# Execução local
 
-- **Python 3.12+ instalado localmente**, a mesma versão usada no `Dockerfile` (`python:latest`) — rodar fora do container exige essa versão instalada na máquina.
-- **Acesso ao Google Cloud (`gcloud auth login`)**, serviços que integram com GCP em runtime (Storage, Pub/Sub, Vertex AI) precisam de credenciais válidas localmente, já que em produção isso vem do manifesto do [Infra-gitops](https://github.com/Solierrr/infra-gitops).
-- **Secrets locais**, variáveis de ambiente equivalentes às injetadas em runtime pelo [Infisical](https://infisical.com) (chaves de API de LLM, strings de conexão de banco) precisam ser criadas manualmente em um `.env` local — sem elas, a aplicação sobe mas falha ao tentar se conectar em dependências externas.
+O preparo comum de Python está em [PYTHON.md](https://github.com/Solierrr/docs-warehouse/blob/main/readme/running/PYTHON.md). O entrypoint deste serviço é `src.api.app:app`.
 
-## Instalação do Projeto
+## Pré-requisitos
 
-### Iniciando o repositório com o Github
+O CI usa Python 3.14, mas o Dockerfile usa `python:latest` e não fixa a mesma versão, por isso o ambiente local deve seguir a versão do CI.
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=github,vscode" height="48" alt="Frameworks">
-  </a>
-</p>
+- Git, Python 3.14, `make` e shell compatível com `sh`, como Git Bash no Windows.
+- Infisical CLI autenticado para obter a configuração local.
+- MongoDB acessível, com permissão para criar índices e checkpoints.
+- `api-auth` para emitir e validar o JWT, `api-core` para consultas e ações e `api-messenger` para o histórico.
+- Credenciais dos provedores usados pelos nós. O roteador e o resumo usam Groq diretamente, além da cadeia com fallback usada em outros pontos.
 
-Clone o repositório e abra no VS Code.
+## Configuração
 
-```Comandos para clonar o repositório
-git clone https://github.com/Solierrr/ai-operational.git
-cd ./ai-operational
-code . -r
+Execute os comandos na raiz do repositório de origem, em um checkout destinado ao desenvolvimento.
+
+```bash
+make doctor
+make vault
+make install
+make dev
 ```
 
-### Instalando dependências necessárias para rodar o projeto localmente
+O `make vault` obtém as pastas `/database`, `/redis`, `/llm`, `/service-urls`, `/mcp` e `/service-keys`, e em QA inclui também `/observability`, sem que nenhum valor de segredo seja versionado. O processo de obtenção está no [guia de segredos](https://github.com/Solierrr/docs-warehouse/blob/main/readme/infisical/README.md).
 
-<p>
-  <a href="https://github.com/syvixor/skills-icons">
-    <img src="https://skills.syvixor.com/api/icons?i=python" height="48" alt="Frameworks">
-  </a>
-</p>
+As variáveis são carregadas de `.env`, com as chaves dos provedores expostas ao ambiente pelo carregador de LLM.
 
-Crie um ambiente virtual antes de instalar as dependências, para não poluir o Python global da máquina. O comando de start varia conforme o entrypoint do repositório — ajuste o módulo (`main:app`, `app.main:app`, etc.) conforme o `CMD`/`ENTRYPOINT` do `Dockerfile` do projeto.
+| Nomes | Uso |
+|---|---|
+| `MONGO_URI`, alternativa `MONGODB_URI` | conexão dos checkpoints, memória e readiness |
+| `JWT_JWKS_URL`, `JWT_ISSUER` | validação do token RS256 |
+| `API_CORE_URL`, `API_MESSENGER_URL` | destinos do cadastro central e do histórico |
+| `SERVICE_KEY`, alternativa `SERVICE_KEY_AI_OPERATIONAL` | chamadas internas e alternativa de assinatura de propostas |
+| `PROPOSAL_SIGNING_KEY` | assinatura estável das propostas entre reinícios |
+| `GEMINI_API_KEY`, `GROQ_API_KEY`, `LLM_PROVIDER_ORDER` | provedores de geração e ordem de fallback |
+| `LLM_MODEL_GEMINI`, `LLM_MODEL_GROQ` | seleção de modelo |
+| `ENVIRONMENT`, `CORS_ALLOWED_ORIGINS`, `A2A_PUBLIC_URL` | ambiente, acesso pelo navegador e endereço do Agent Card |
+| `DEBUG_ADMIN_SUBS`, `DOCS_ENABLED` | acesso ao debug e exposição do Swagger |
+| `CHECKPOINT_TTL_DIAS`, `PROPOSAL_TTL_SECONDS`, `MAX_WRITES_PER_CONVERSATION`, `MAX_MESSAGE_CHARS` | retenção e limites |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED` | destino ou desativação da telemetria |
 
-```Comandos para instalação de dependências
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn src.api.app:app --reload
-```
+Os clientes MCP e Redis não são requisitos do grafo atual. A configuração deles permanece em `settings.py`.
 
-## Autenticação e CORS do `/chat`
+## Comandos disponíveis
 
-O `POST /chat` valida o JWT do `api-auth` (RS256 via `JWT_JWKS_URL`, emissor `JWT_ISSUER`) antes de rodar o turno: token inválido, expirado ou de refresh responde `401`. Fora do ambiente `LOCAL`, sem `JWT_JWKS_URL` a rota responde `503` em vez de ficar aberta. As origens do navegador autorizadas vêm de `CORS_ALLOWED_ORIGINS` (lista separada por vírgula, sem credenciais e sem `*`).
-## Autenticação local
+O Makefile usa o Python do ambiente virtual e escolhe o caminho correto para Windows ou Unix.
 
-O JWT de usuário vem do `api-auth` de verdade, sem emissor falso: suba a stack local com `make dev-up` no `database-console` e aponte `JWT_JWKS_URL` para o JWKS dele (`http://localhost:8081/.well-known/jwks.json`). Para conversar pelo terminal, rode `python main.py` e informe o access token obtido no login do `api-auth` local.
+| Comando | Resultado |
+|---|---|
+| `make dev` | Uvicorn com reload na porta local 8000 |
+| `make test` | pytest com cobertura de `src` |
+| `make lint` | Ruff em `main.py`, `src/workflow` e `src/core/llm` |
+| `make format` | formata os mesmos caminhos do lint |
+| `make build` | compila os módulos Python com `compileall` |
+| `make openapi` | exporta o contrato da camada web, sem executar o lifespan |
+| `make ci` | lint, testes e build |
+
+Para conversar no terminal, execute `python main.py` com o ambiente virtual ativo. O token obtido no login local é solicitado em entrada oculta. Esse caminho executa operações reais e não passa pelo lifespan que cria o índice da memória. Suba a API ao menos uma vez antes de usar a CLI.
+
+## Verificação local
+
+Abra o [Swagger local](http://localhost:8000/docs), use Authorize com o access token e envie "Onde cadastro uma oferta de placa?". Os exemplos estão em [API.md](./API.md). `/health` deve responder com processo e versão, enquanto `/ready` depende somente do MongoDB.
+
+O banco pode impedir a partida durante a criação do índice. A compilação do grafo também abre o checkpointer na primeira conversa. Sem `JWT_JWKS_URL`, somente `LOCAL` permite seguir sem validar o token. Use o emissor real para testar identidade e permissões.
+
+Sem URL ou credencial válida do `api-messenger`, o turno normal pode falhar antes de gerar uma resposta, pois grava o histórico primeiro. Sem coletor configurado, a instrumentação pode tentar exportar para o destino local padrão. Os testes usam mocks em vários pontos e não substituem uma chamada integrada com essas dependências.
