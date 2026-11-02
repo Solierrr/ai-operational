@@ -27,7 +27,7 @@ make install
 make dev
 ```
 
-O `make vault` obtém as pastas `/database`, `/redis`, `/llm`, `/service-urls`, `/mcp` e `/service-keys`, e em QA inclui também `/observability`, sem que nenhum valor de segredo seja versionado. O processo de obtenção está no [guia de segredos](https://github.com/Solierrr/docs-warehouse/blob/main/readme/infisical/README.md).
+O `make vault` obtém as pastas `/database`, `/llm`, `/service-urls`, `/mcp` e `/service-keys`, e em QA inclui também `/observability`, sem que nenhum valor de segredo seja versionado. O processo de obtenção está no [guia de segredos](https://github.com/Solierrr/docs-warehouse/blob/main/readme/infisical/README.md).
 
 As variáveis são carregadas de `.env`, com as chaves dos provedores expostas ao ambiente pelo carregador de LLM.
 
@@ -45,7 +45,7 @@ As variáveis são carregadas de `.env`, com as chaves dos provedores expostas a
 | `CHECKPOINT_TTL_DIAS`, `PROPOSAL_TTL_SECONDS`, `MAX_WRITES_PER_CONVERSATION`, `MAX_MESSAGE_CHARS` | retenção e limites |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SDK_DISABLED` | destino ou desativação da telemetria |
 
-Os clientes MCP e Redis não são requisitos do grafo atual. A configuração deles permanece em `settings.py`.
+O cliente MCP não é requisito do grafo atual, e a configuração dele permanece em `settings.py`.
 
 ## Comandos disponíveis
 
