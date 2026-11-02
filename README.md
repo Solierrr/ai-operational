@@ -33,7 +33,6 @@ O assistente principal delega as tarefas operacionais a este serviço. A convers
 - [STATUS.md](./docs/STATUS.md), funcionalidades e limitações verificadas.
 - [Fluxos](./flows/), delegação, consultas e aprovação de alterações.
 - [Banco de dados](./database/), memória persistida e responsabilidades.
-- [PENDENCIAS.md](./PENDENCIAS.md), decisões que precisam da resposta do responsável.
 
 ## Contribuindo
 

@@ -16,7 +16,7 @@ Os endereços abaixo vêm do contrato HTTP e dos manifestos.
 | QA | Render | [API de QA](https://ai-operational.onrender.com) |
 | Produção | GKE, com ingresso Kong declarado | [API de produção declarada](https://operational.solarianetwork.site) |
 
-O QA está publicado no Render, no endereço acima, e a main analisada não contém `render.yaml` nem `render-entrypoint.sh`, porque a configuração é injetada pela plataforma.
+O QA está publicado no Render, no endereço acima, e o `render-entrypoint.sh` carrega os segredos do Infisical antes de iniciar o Uvicorn.
 
 Os manifestos de produção são o [Deployment](https://github.com/Solierrr/infra-gitops/blob/main/services/ai-operational/deployment.yaml), o [Service](https://github.com/Solierrr/infra-gitops/blob/main/services/ai-operational/service.yaml), o [Ingress](https://github.com/Solierrr/infra-gitops/blob/main/services/ai-operational/ingress.yaml) e a [aplicação do Argo CD](https://github.com/Solierrr/infra-gitops/blob/main/apps/ai/ai-operational.yaml), e o serviço está em operação no cluster de produção.
 
