@@ -10,10 +10,10 @@ from src.api.routes import chat, debug, health
 from src.core.config.settings import settings
 from src.core.llm.keys import key_client
 from src.core.observability.langsmith_tracing import warn_if_global_tracing
+from src.core.observability.observability import setup_observability
 from src.infra.database.mongo.indexes.user_memory_indexes import (
     ensure_user_memory_indexes,
 )
-from src.otel_setup import configure_otel
 from src.version import VERSION
 
 A2A_PATHS = ("/a2a", "/.well-known/")
@@ -73,6 +73,8 @@ app = FastAPI(
     },
     lifespan=lifespan,
 )
+# logo após criar a app -> os spans HTTP já existem quando as rotas e os middlewares entram
+setup_observability(app, "ai-operational")
 
 app.add_middleware(
     CORSMiddleware,
@@ -129,5 +131,3 @@ def public_openapi() -> dict:
 
 
 app.openapi = public_openapi
-
-configure_otel(app, "ai-operational")
