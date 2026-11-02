@@ -33,14 +33,14 @@ As responsabilidades ficam separadas entre entrada, execução e acesso aos serv
 | `src/actions/` | registro de ações, rascunhos, propostas assinadas e execução |
 | `src/agents/` | prompts e construção dos agentes |
 | `src/domain/`, `src/tools/` | catálogo de telas, guias e ferramentas de consulta |
-| `src/infra/` | clientes HTTP, MongoDB, MCP e Redis |
+| `src/infra/` | clientes HTTP, MongoDB e MCP |
 | `src/memory/` | checkpointer do LangGraph |
 | `src/core/` | configuração, JWT, proteção de entrada e observabilidade |
 | `tests/` | testes de API, ações, infraestrutura e workflow |
 
 ## Integrações
 
-O código atual usa o `api-core` para os dados operacionais, e os clientes MCP e Redis permanecem na infraestrutura, sem chamada no grafo ativo, embora o mapa central ainda descreva o MCP como dependência da delegação.
+O código atual usa o `api-core` para os dados operacionais, e o cliente MCP permanece na infraestrutura, sem chamada no grafo ativo, embora o mapa central ainda descreva o MCP como dependência da delegação.
 
 | Com quem | Direção | Protocolo | Autenticação |
 |---|---|---|---|
@@ -52,7 +52,6 @@ O código atual usa o `api-core` para os dados operacionais, e os clientes MCP e
 | Gemini e Groq | este serviço chama | HTTPS pelos SDKs de LLM | chave do provedor |
 | LangSmith | este serviço envia traces opcionais | HTTPS | credencial própria |
 | `mcp-database` | cliente presente, sem uso no grafo | MCP Streamable HTTP | `X-Service-Key`, com `x-api-key` legado se configurado |
-| Redis | cliente presente, sem uso no grafo | Redis com TLS | usuário e senha |
 
 O JWT no `api-core` preserva as permissões de quem pediu a operação. As chamadas internas ao serviço de mensagens seguem o [fluxo de autenticação entre serviços](https://github.com/Solierrr/docs-warehouse/blob/main/docs/flows/SERVICE_TO_SERVICE_AUTH.md).
 
@@ -82,7 +81,7 @@ O `StepTracker` envia etapas e chamadas de LLM ao `api-messenger`. O custo por c
 
 O tracing LangSmith é opcional, com amostragem e mascaramento de documentos, telefone, e-mail, JWT e chaves. Nomes e endereços não são mascarados. O tracing global do SDK recebe apenas um aviso de configuração e deve permanecer desligado para usar o caminho com mascaramento.
 
-O OpenTelemetry instrumenta FastAPI, HTTPX, MongoDB e Redis a partir de `OTEL_EXPORTER_OTLP_ENDPOINT`, `SERVICE_VERSION`, `DEPLOYMENT_ENVIRONMENT` e `OTEL_TRACES_SAMPLING_PROBABILITY`, e pode ser desligado com `OTEL_SDK_DISABLED`. As respostas com um span válido levam o cabeçalho `X-Trace-Id`, e a exclusão automática de rastreamento cobre o `/health`, mas não o `/ready`.
+O OpenTelemetry instrumenta FastAPI, HTTPX e MongoDB a partir de `OTEL_EXPORTER_OTLP_ENDPOINT`, `SERVICE_VERSION`, `DEPLOYMENT_ENVIRONMENT` e `OTEL_TRACES_SAMPLING_PROBABILITY`, e pode ser desligado com `OTEL_SDK_DISABLED`. As respostas com um span válido levam o cabeçalho `X-Trace-Id`, e a exclusão automática de rastreamento cobre o `/health`, mas não o `/ready`.
 
 O `/health` informa o processo e a versão, e o `/ready` faz apenas um `ping` no MongoDB com limite de dois segundos, sem mudar quando o modelo de linguagem ou o serviço de mensagens falham. O `version.txt` alimenta a API, o OpenAPI, o Agent Card e o health, enquanto a versão enviada à telemetria depende da configuração do ambiente.
 
