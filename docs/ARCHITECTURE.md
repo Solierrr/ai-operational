@@ -87,3 +87,166 @@ O OpenTelemetry instrumenta FastAPI, HTTPX, MongoDB e Redis a partir de `OTEL_EX
 O `/health` informa o processo e a versão, e o `/ready` faz apenas um `ping` no MongoDB com limite de dois segundos, sem mudar quando o modelo de linguagem ou o serviço de mensagens falham. O `version.txt` alimenta a API, o OpenAPI, o Agent Card e o health, enquanto a versão enviada à telemetria depende da configuração do ambiente.
 
 A análise usa a main em [`d1a5e666`](https://github.com/Solierrr/ai-operational/commit/d1a5e666df853aba51ab49f190c7c0b631613b80), conferida em 2026-10-30.
+
+## Diagrama de arquitetura
+
+### Onde o serviço se encaixa
+
+O `ai-operational` não recebe conversa direto do usuário: o `ai-assistant` delega a ele por A2A, repassando o JWT do usuário. Tudo que o serviço lê ou grava no `api-core` usa esse JWT.
+
+```mermaid
+flowchart LR
+    U(["usuário (web)"]) --> ASS["ai-assistant"]
+    ASS ==>|"A2A + JWT do usuário<br/>habilidade operar-saas"| OPS
+
+    subgraph OPS["ai-operational (FastAPI + LangGraph)"]
+        G["grafo de agentes"]
+        ACT["ações e proposta assinada"]
+    end
+
+    OPS -->|"lê e grava com o JWT do usuário"| CORE["api-core"]
+    OPS --> MONGO[("MongoDB<br/>checkpoints e proposta pendente")]
+    OPS --> MSG["api-messenger<br/>passos do turno"]
+    OPS --> LLM["Gemini, Groq, OpenAI"]
+    OPS -.->|"opcional"| LS["LangSmith<br/>PII mascarada"]
+```
+
+### Grafo de um turno
+
+```mermaid
+flowchart TD
+    START([mensagem]) --> IG["input_guardrail<br/>tamanho, injeção, PII"]
+    IG -->|bloqueada| END0([recusa])
+    IG --> CM["condense_memory"]
+    CM --> R{"router"}
+
+    R --> SF["screen_finder<br/>onde fica a tela"]
+    R --> HG["how_to_guide<br/>passo a passo"]
+    R --> DR["data_reader<br/>dados do usuário, só leitura"]
+    R --> AP["action_proposer<br/>monta a proposta, sem gravar"]
+    R -->|"há proposta pendente"| PD["proposal_decision<br/>aceite, recusa, dúvida"]
+
+    SF --> R
+    HG --> R
+    DR --> R
+
+    R -->|"informação suficiente"| ORQ["orchestrator"]
+    ORQ --> J["judge"]
+    J --> OG["output_guardrail<br/>remove links e segredos"]
+    OG --> END1([resposta])
+
+    AP -->|"proposta, exatamente como montada"| END2([resposta ao usuário])
+    PD -->|"executou ou recusou"| END3([resposta ao usuário])
+    PD -->|"ajustar ou outro assunto:<br/>descarta a proposta"| R
+```
+
+### Ciclo de vida de uma proposta
+
+```mermaid
+stateDiagram-v2
+    [*] --> Proposta: action_proposer monta e assina
+    Proposta --> Executada: aceite exato do usuário<br/>("sim", ou "confirmo" se irreversível)
+    Proposta --> Recusada: "não"
+    Proposta --> Descartada: ajustar ou mudar de assunto
+    Proposta --> Expirada: 15 minutos sem decisão
+    Proposta --> Proposta: dúvida: responde e continua pendente
+    Executada --> [*]: grava no api-core com o JWT do usuário
+    Recusada --> [*]
+    Descartada --> [*]
+    Expirada --> [*]
+```
+
+### O que acontece com a oferta: aceite, recusa, dúvida, ajuste e expiração
+
+Exemplo com o cadastro de uma oferta. As mesmas respostas valem para as outras ações, com a mensagem de recusa própria de cada uma.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Usuário
+    participant O as ai-operational
+    participant C as api-core
+
+    U->>O: "Cadastra uma placa Canadian CS6R 550 Wp, R$ 900, 40 unidades"
+    O->>C: lê as empresas do usuário e os modelos aprovados (JWT do usuário)
+    C-->>O: dados do próprio usuário
+    O->>O: monta o payload, assina e guarda como proposta pendente
+    O-->>U: proposta com empresa, placa, título, descrição, preço e quantidade.<br/>"Você aceita?"
+
+    alt aceite exato ("sim", "aceito"...)
+        O->>O: confere assinatura, validade e dono da proposta
+        O->>C: POST /offers com o JWT do usuário
+        alt o api-core aceita
+            C-->>O: oferta criada
+            O-->>U: "Pronto, a oferta ... foi cadastrada"
+        else o api-core recusa
+            C-->>O: erro com o motivo
+            O-->>U: "Não consegui executar. (motivo)" e a proposta é descartada
+        end
+    else recusa ("não", "recuso", "cancela")
+        O-->>U: "Tudo bem, não cadastrei nada."
+        Note over O: proposta descartada, nada foi gravado
+    else dúvida ("por que esse preço?")
+        O-->>U: explica e lembra que a proposta continua pendente
+    else ajuste ("muda o preço para 850")
+        Note over O: proposta descartada, a mensagem volta ao roteador
+        O-->>U: nova proposta com o valor ajustado
+    else outro assunto
+        Note over O: proposta descartada, a mensagem é tratada normalmente
+    else passaram 15 minutos
+        alt a resposta é um sim ou um não
+            O-->>U: "Essa proposta expirou por segurança e nada foi feito"
+        else qualquer outra mensagem
+            Note over O: a proposta vencida é descartada em silêncio
+        end
+    end
+```
+
+Nos dois casos que não executam (recusa e expiração), nada é gravado e a proposta sai do estado. Para uma ação irreversível (encerrar oferta, cancelar pedido) o aceite não é "sim": só vale a palavra "confirmo"; um "sim" recebe de volta o pedido de confirmação e a proposta continua pendente.
+
+### Como o agente monta a proposta
+
+```mermaid
+flowchart TD
+    M(["pedido de ação do usuário"]) --> T{"tem JWT?"}
+    T -->|não| X1(["pede para entrar na conta"])
+    T -->|sim| L{"limite de gravações<br/>da conversa atingido?"}
+    L -->|sim| X2(["explica o limite e sugere nova conversa"])
+    L -->|não| P{"é compra, pagamento, exclusão,<br/>transferência, senha, cargo ou permissão?"}
+    P -->|sim| X3(["recusa e indica a tela da plataforma"])
+    P -->|não| S["seleciona a ação na lista fixa<br/>(LLM escolhe entre 5 ações ou proibida)"]
+    S -->|"nenhuma ou desconhecida"| X4(["não entendi: lista o que sabe fazer"])
+    S --> E["extrai os dados do pedido (LLM)"]
+    E -->|"saída inválida"| X4
+    E --> PR["prepare: confere o pedido nos dados<br/>do próprio usuário no api-core"]
+    PR -->|"falta campo, nome ambíguo ou<br/>item não encontrado"| Q(["pergunta ao usuário, com opções"])
+    PR -->|pronto| AS["monta o resumo, assina<br/>e grava como proposta pendente"]
+    AS --> R(["proposta ao usuário:<br/>você aceita?"])
+```
+
+### Ações disponíveis
+
+| Ação | Endpoint no `api-core` | Aceite |
+|---|---|---|
+| `create_offer`: cadastrar oferta | `POST /offers` | "sim" |
+| `set_offer_status`: pausar ou reativar | `PATCH /offers/{id}/status` | "sim" |
+| `set_offer_status`: encerrar | `PATCH /offers/{id}/status` | só "confirmo" |
+| `set_inventory_quantity`: ajustar estoque | `PATCH /inventories/{id}/quantity` | "sim" |
+| `cancel_order`: cancelar pedido | `PATCH /orders/{id}/cancel` | só "confirmo" |
+| `update_cart`: mexer no carrinho (não finaliza compra) | `PUT` ou `DELETE /cart/items/{offerId}` | "sim" |
+
+### Camadas de segurança
+
+```mermaid
+flowchart LR
+    A["mensagem"] --> B["guardrail de entrada<br/>tamanho máximo, regex de injeção<br/>(inclui pedidos de pular o aceite)<br/>e classificador por LLM"]
+    B --> C["pedido proibido<br/>recusado por regex e pelo seletor"]
+    C --> D["ids só vindos dos dados do próprio<br/>usuário, nunca do texto do modelo"]
+    D --> E["proposta assinada (HMAC),<br/>com validade e dona"]
+    E --> F["aceite conferido em código:<br/>o LLM não pode aceitar"]
+    F --> G["teto de gravações<br/>por conversa"]
+    G --> H["grava com o JWT do usuário,<br/>sem credencial de serviço"]
+    H --> I["resposta sem links<br/>nem segredos"]
+```
+
+Dados lidos do `api-core` e das ferramentas entram nos prompts marcados como dado e com links e instruções neutralizados, nunca como instrução.
