@@ -131,8 +131,11 @@ flowchart TD
     DR --> R
 
     R -->|"informação suficiente"| ORQ["orchestrator"]
-    ORQ --> J["judge"]
-    J --> OG["output_guardrail<br/>remove links e segredos"]
+    ORQ --> J{"judge"}
+    J -->|"aprovada"| OG["output_guardrail<br/>remove links e segredos"]
+    J -->|"reprovada: 1 nova tentativa"| ORQ
+    J -->|"reprovada de novo"| BL["resposta trocada por<br/>pedido de reformulação"]
+    BL --> OG
     OG --> END1([resposta])
 
     AP -->|"proposta, exatamente como montada"| END2([resposta ao usuário])
