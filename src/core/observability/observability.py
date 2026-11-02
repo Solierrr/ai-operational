@@ -28,7 +28,6 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
@@ -84,9 +83,8 @@ def setup_observability(app: FastAPI, service_name: str, **httpx_hooks) -> None:
     )
     # propaga traceparent nas chamadas para outras APIs
     HTTPXClientInstrumentor().instrument(**httpx_hooks)
-    # Mongo e Redis entram nos traces como spans filhos da request -> a latência de banco aparece no trace
+    # o Mongo entra nos traces como span filho da request -> a latência de banco aparece no trace
     PymongoInstrumentor().instrument()
-    RedisInstrumentor().instrument()
 
     @app.middleware("http")
     async def _trace_id_header(request: Request, call_next):
