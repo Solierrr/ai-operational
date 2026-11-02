@@ -3,7 +3,7 @@
 # Requer: make e sh (Git Bash no Windows). Para `make vault`: Infisical CLI e `infisical login`.
 
 # ---- especifico deste repositorio ----
-VAULT_FOLDERS ?= /database /redis /llm /service-urls /mcp /service-keys
+VAULT_FOLDERS ?= /database /llm /service-urls /mcp /service-keys
 # /observability (LangSmith) so existe no QA; Local e Production ainda tem /obervability.
 ifeq ($(ENV),qa)
 VAULT_FOLDERS += /observability
