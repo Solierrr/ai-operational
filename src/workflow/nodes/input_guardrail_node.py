@@ -13,7 +13,7 @@ from src.core.guardrails.injection_patterns import (
     matches_internal_data_keyword,
 )
 from src.core.guardrails.prompt import _PROMPT_CLASSIFICADOR
-from src.core.llm.llm_groq import llm_groq
+from src.core.llm.llm_chain import llm_chain
 from src.core.security.untrusted import wrap_untrusted
 from src.workflow.state import GraphState
 
@@ -121,7 +121,7 @@ def input_guardrail_node(state: GraphState, config=None) -> dict:
     )
 
     try:
-        resposta = llm_groq().invoke(
+        resposta = llm_chain().invoke(
             [HumanMessage(content=formatted_prompt)], config=config
         )
         classificacao = _parse_classificacao(resposta.content)

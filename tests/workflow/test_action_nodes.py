@@ -312,7 +312,7 @@ def test_proposta_pendente_invalida_e_descartada(monkeypatch):
 
 def test_roteador_devolve_a_resposta_para_a_decisao_sem_chamar_o_llm(monkeypatch):
     llm = Mock()
-    monkeypatch.setattr(router_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(router_node, "llm_chain", Mock(return_value=llm))
     state = {"messages": [HumanMessage(content="sim")], "pending_proposal": PENDENTE}
 
     result = router_node.router_node(state)
@@ -345,7 +345,7 @@ def test_resposta_curta_a_uma_proposta_pula_a_classificacao_por_llm(monkeypatch)
     from src.workflow.nodes import input_guardrail_node as guardrail
 
     llm = Mock()
-    monkeypatch.setattr(guardrail, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(guardrail, "llm_chain", Mock(return_value=llm))
     state = {"messages": [HumanMessage(content="sim")], "pending_proposal": PENDENTE}
 
     result = guardrail.input_guardrail_node(state)
@@ -361,7 +361,7 @@ def test_mensagem_longa_com_proposta_pendente_continua_sendo_classificada(monkey
     llm.invoke.return_value = AIMessage(
         content="CATEGORIA: APROVADO\nJUSTIFICATIVA: ok"
     )
-    monkeypatch.setattr(guardrail, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(guardrail, "llm_chain", Mock(return_value=llm))
     state = {
         "messages": [HumanMessage(content="e o frete como fica?")],
         "pending_proposal": PENDENTE,

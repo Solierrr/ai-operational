@@ -1,6 +1,6 @@
 from langchain_core.messages import HumanMessage, RemoveMessage
 
-from src.core.llm import llm_groq
+from src.core.llm.llm_chain import llm_chain
 from src.workflow.state import GraphState
 from src.workflow.turn_tracking import append_turn_agent
 
@@ -43,7 +43,7 @@ def condense_history_node(state: GraphState, config=None) -> dict:
     )
 
     new_summary = (
-        llm_groq()
+        llm_chain()
         .invoke([HumanMessage(content=formatted_prompt)], config=config)
         .content.strip()
     )

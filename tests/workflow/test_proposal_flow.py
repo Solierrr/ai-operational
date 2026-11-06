@@ -52,10 +52,10 @@ def app(monkeypatch):
     proposer = importlib.import_module("src.workflow.nodes.action_proposer_node")
     decision = importlib.import_module("src.workflow.nodes.proposal_decision_node")
     monkeypatch.setattr(
-        guardrail, "llm_groq", lambda: _llm("CATEGORIA: APROVADO\nJUSTIFICATIVA: ok")
+        guardrail, "llm_chain", lambda: _llm("CATEGORIA: APROVADO\nJUSTIFICATIVA: ok")
     )
     monkeypatch.setattr(
-        router, "llm_groq", lambda: _llm("ROTA: action_proposer\nRESPOSTA_DIRETA:")
+        router, "llm_chain", lambda: _llm("ROTA: action_proposer\nRESPOSTA_DIRETA:")
     )
 
     async def ask_json(prompt, config=None):
@@ -125,12 +125,12 @@ def test_aceite_repetido_depois_de_executar_nao_grava_duas_vezes(app, monkeypatc
     # Sem proposta pendente, o roteador volta a decidir pelo LLM e responde direto.
     monkeypatch.setattr(
         router,
-        "llm_groq",
+        "llm_chain",
         lambda: _llm("ROTA: None\nRESPOSTA_DIRETA: Não há nada pendente."),
     )
     monkeypatch.setattr(
         output,
-        "llm_groq",
+        "llm_chain",
         lambda: _llm("STATUS: APROVADO\nRESPOSTA: Não há nada pendente."),
     )
     terceiro = _turno(compiled, "sim")

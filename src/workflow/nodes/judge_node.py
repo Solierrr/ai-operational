@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from src.agents.base.base_prompt import build_system_prompt
 from src.agents.specialist.judge.judge_prompt import JUDGE_AGENT
-from src.core.llm.llm_groq import llm_groq
+from src.core.llm.llm_chain import llm_chain
 from src.workflow.state import GraphState
 from src.workflow.turn_tracking import append_turn_agent
 
@@ -72,7 +72,7 @@ def judge_node(state: GraphState, config=None) -> dict:
         HumanMessage(content=f"Resposta a ser auditada:\n\n{last_message}"),
     ]
     try:
-        resposta = llm_groq().invoke(messages_with_context, config=config)
+        resposta = llm_chain().invoke(messages_with_context, config=config)
         veredito = _parse_veredito_juiz(resposta.content)
         status = veredito.status
     except (GroqError, ValueError, TypeError, AttributeError) as erro:

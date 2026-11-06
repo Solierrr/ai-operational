@@ -21,7 +21,7 @@ def _mock_llm(status, justification="justificativa qualquer"):
 
 def test_judge_approves_valid_response(monkeypatch):
     llm = _mock_llm("APROVADO", "resposta coerente")
-    monkeypatch.setattr(judge_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(judge_node, "llm_chain", Mock(return_value=llm))
     result = judge_node.judge_node(
         {"messages": [AIMessage(content="Resposta final", id="msg-1")]}
     )
@@ -36,7 +36,7 @@ def test_judge_approves_valid_response(monkeypatch):
 
 def test_judge_retries_once_when_rejected(monkeypatch):
     llm = _mock_llm("REPROVADO")
-    monkeypatch.setattr(judge_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(judge_node, "llm_chain", Mock(return_value=llm))
     result = judge_node.judge_node(
         {"messages": [AIMessage(content="Resposta", id="msg-2")], "judge_retries": 0}
     )
@@ -47,7 +47,7 @@ def test_judge_retries_once_when_rejected(monkeypatch):
 
 def test_judge_blocks_after_retries(monkeypatch):
     llm = _mock_llm("REPROVADO")
-    monkeypatch.setattr(judge_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(judge_node, "llm_chain", Mock(return_value=llm))
     result = judge_node.judge_node(
         {"messages": [AIMessage(content="Resposta", id="msg-3")], "judge_retries": 1}
     )
@@ -58,7 +58,7 @@ def test_judge_blocks_after_retries(monkeypatch):
 def test_judge_retries_for_malformed_response(monkeypatch):
     llm = Mock()
     llm.invoke.return_value = AIMessage(content="Parece uma boa resposta")
-    monkeypatch.setattr(judge_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(judge_node, "llm_chain", Mock(return_value=llm))
     result = judge_node.judge_node(
         {"messages": [AIMessage(content="Resposta", id="msg-4")], "judge_retries": 0}
     )
@@ -68,7 +68,7 @@ def test_judge_retries_for_malformed_response(monkeypatch):
 def test_judge_retries_when_groq_fails(monkeypatch):
     llm = Mock()
     llm.invoke.side_effect = GroqError("groq indisponivel")
-    monkeypatch.setattr(judge_node, "llm_groq", Mock(return_value=llm))
+    monkeypatch.setattr(judge_node, "llm_chain", Mock(return_value=llm))
     result = judge_node.judge_node(
         {"messages": [AIMessage(content="Resposta", id="msg-5")], "judge_retries": 0}
     )

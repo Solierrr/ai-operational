@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from src.agents.base.base_prompt import build_system_prompt
 from src.agents.specialist.router.router_prompt import ROUTER_AGENT
-from src.core.llm.llm_groq import llm_groq
+from src.core.llm.llm_chain import llm_chain
 from src.workflow import config
 from src.workflow.edges.routing_edges import (
     available_specialist_routes,
@@ -98,7 +98,7 @@ def router_node(state: GraphState, runnable_config=None) -> dict:
         *messages_with_summary(state),
     ]
     try:
-        resposta = llm_groq().invoke(messages_with_context, config=runnable_config)
+        resposta = llm_chain().invoke(messages_with_context, config=runnable_config)
         decisao = _parse_decisao_roteamento(resposta.content)
     except (GroqError, ValueError, TypeError, AttributeError):
         # O orquestrador consegue compor uma resposta a partir do contexto;

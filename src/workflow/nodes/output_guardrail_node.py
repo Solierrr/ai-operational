@@ -7,7 +7,7 @@ from pydantic import BaseModel, ValidationError
 from src.agents.base.base_prompt import build_system_prompt
 from src.core.guardrails.anonymize import deanonymize_text
 from src.core.guardrails.prompt import _PROMPT_COMPLIANCE
-from src.core.llm.llm_groq import llm_groq
+from src.core.llm.llm_chain import llm_chain
 from src.core.security.untrusted import scrub_output
 from src.workflow.outcome import Outcome, Reason, outcome_kwargs
 from src.workflow.state import GraphState
@@ -72,7 +72,7 @@ def output_guardrail_node(state: GraphState, config=None) -> dict:
 
     degraded: dict = {}
     try:
-        resposta = llm_groq().invoke(
+        resposta = llm_chain().invoke(
             [HumanMessage(content=formatted_prompt)], config=config
         )
         revisao = _parse_revisao_compliance(resposta.content)
